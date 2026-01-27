@@ -18,13 +18,14 @@ def lang(uid):
 
 
 # ================= START =================
-@dp.message_handler(commands=['start'], chat_type='private')
+@dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
 # ================= UNIVERSAL HANDLER =================
-@dp.message_handler(chat_type='private', content_types=types.ContentType.TEXT)
+# 🔥 GROUP + PRIVATE ikkalasini ham ushlaydi
+@dp.message_handler(content_types=types.ContentType.TEXT)
 async def router(message: types.Message):
 
     uid = message.from_user.id
@@ -58,21 +59,17 @@ async def router(message: types.Message):
         return
 
 
-    # ========= WITHDRAW =========
+    # ========= THREAD TANLASH =========
     if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
         users_thread[uid] = WITHDRAW_THREAD
         await message.answer(TEXTS[l]["login_pass"])
         return
 
-
-    # ========= NO ACCOUNT =========
     if any(TEXTS[x]["no_account"] == text for x in TEXTS):
         users_thread[uid] = NO_ACCOUNT_THREAD
         await message.answer(TEXTS[l]["login_pass"])
         return
 
-
-    # ========= TECH =========
     if any(TEXTS[x]["tech"] == text for x in TEXTS):
         users_thread[uid] = TECH_THREAD
         await message.answer(TEXTS[l]["login_pass"])
@@ -96,7 +93,7 @@ async def router(message: types.Message):
 
 
     # ==================================================
-    # =============== SEND TO GROUP (FINAL) =============
+    # =============== SEND TO GROUP =====================
     # ==================================================
     if uid in users_thread:
 
@@ -116,22 +113,15 @@ async def router(message: types.Message):
             f"💬 {text}"
         )
 
-        # guruhga yuborish
         await bot.send_message(
             GROUP_ID,
             send_text,
             message_thread_id=thread_id
         )
 
-        # foydalanuvchiga javob
         await message.answer(TEXTS[l]["sent"])
-
-        # 🔥 ENG MUHIM — threadni tozalaymiz (1 martalik)
         users_thread.pop(uid, None)
-
-        # 🔥 avtomatik bosh menu
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
-
         return
 
 
