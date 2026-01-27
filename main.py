@@ -24,12 +24,11 @@ async def start(message: types.Message):
 
 
 # ======================================================
-# 🔥 UNIVERSAL HANDLER (NO FILTER = EVERYTHING WORKS)
+# 🔥 PRIVATE ONLY (USER -> BOT)
 # ======================================================
-@dp.message_handler()   # 🔥 ENG MUHIM — hech qanday filter YO‘Q
-async def router(message: types.Message):
+@dp.message_handler(lambda m: m.chat.type == "private")
+async def private_router(message: types.Message):
 
-    # faqat text bilan ishlaymiz
     if not message.text:
         return
 
@@ -38,7 +37,7 @@ async def router(message: types.Message):
     l = lang(uid)
 
 
-    # ========= LANGUAGE =========
+    # ===== LANGUAGE =====
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
@@ -46,25 +45,21 @@ async def router(message: types.Message):
         return
 
 
-    # ========= CHANGE =========
+    # ===== MENU BUTTONS =====
     if any(TEXTS[x]["change"] == text for x in TEXTS):
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
-
-    # ========= ADMIN =========
     if any(TEXTS[x]["admin"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
-
-    # ========= HELP MENU =========
     if any(TEXTS[x]["help"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
-    # ========= THREAD TANLASH =========
+    # ===== THREAD TANLASH =====
     if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
         users_thread[uid] = WITHDRAW_THREAD
         await message.answer(TEXTS[l]["login_pass"])
@@ -81,48 +76,19 @@ async def router(message: types.Message):
         return
 
 
-    # ========= VIDEOS =========
-    if any(TEXTS[x]["register"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/3")
-        return
-
-    if any(TEXTS[x]["trade"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/4")
-        return
-
-
-    # ========= BACK =========
-    if any(TEXTS[x]["back"] == text for x in TEXTS):
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
-        return
-
-
-    # ==================================================
-    # =============== SEND TO GROUP =====================
-    # ==================================================
+    # ===== MUAMMO MATNI → GROUPGA YUBORISH =====
     if uid in users_thread:
 
         thread_id = users_thread[uid]
 
-        profile = (
-            f"https://t.me/{message.from_user.username}"
-            if message.from_user.username
-            else f"tg://user?id={uid}"
-        )
-
         send_text = (
             f"📩 YANGI MUAMMO\n\n"
             f"👤 {message.from_user.full_name}\n"
-            f"🔗 {profile}\n"
             f"🆔 {uid}\n\n"
             f"💬 {text}"
         )
 
-        await bot.send_message(
-            GROUP_ID,
-            send_text,
-            message_thread_id=thread_id
-        )
+        await bot.send_message(GROUP_ID, send_text, message_thread_id=thread_id)
 
         await message.answer(TEXTS[l]["sent"])
         users_thread.pop(uid, None)
@@ -130,6 +96,9 @@ async def router(message: types.Message):
         return
 
 
-# ================= RUN =================
+# ======================================================
+# 🔥 RUN (ENG MUHIM FIX)
+# ======================================================
 if __name__ == "__main__":
-    executor.start_polling(dp, skip_updates=True)
+    print("BOT STARTED 🚀")
+    executor.start_polling(dp)   # ❌ skip_updates YO‘Q
