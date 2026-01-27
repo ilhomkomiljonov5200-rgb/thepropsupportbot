@@ -23,10 +23,15 @@ async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
-# ================= UNIVERSAL HANDLER =================
-# 🔥 GROUP + PRIVATE ikkalasini ham ushlaydi
-@dp.message_handler(content_types=types.ContentType.TEXT)
+# ======================================================
+# 🔥 UNIVERSAL HANDLER (NO FILTER = EVERYTHING WORKS)
+# ======================================================
+@dp.message_handler()   # 🔥 ENG MUHIM — hech qanday filter YO‘Q
 async def router(message: types.Message):
+
+    # faqat text bilan ishlaymiz
+    if not message.text:
+        return
 
     uid = message.from_user.id
     text = message.text
