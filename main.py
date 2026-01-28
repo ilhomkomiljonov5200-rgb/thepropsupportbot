@@ -13,7 +13,6 @@ users_lang = {}
 users_thread = {}
 
 
-# ================= HELPERS =================
 def lang(uid):
     return users_lang.get(uid, "uz")
 
@@ -40,9 +39,26 @@ async def router(message: types.Message):
 
     # ========= LANGUAGE =========
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
-        l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
-        users_lang[uid] = l
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
+        users_lang[uid] = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
+        await message.answer(TEXTS[users_lang[uid]]["menu"], reply_markup=main_menu(users_lang[uid]))
+        return
+
+
+    # ========= CHANGE =========
+    if any(TEXTS[x]["change"] == text for x in TEXTS):
+        await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
+        return
+
+
+    # ========= ADMIN =========
+    if any(TEXTS[x]["admin"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
+        return
+
+
+    # ========= HELP =========
+    if any(TEXTS[x]["help"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
@@ -63,6 +79,22 @@ async def router(message: types.Message):
         return
 
 
+    # ========= VIDEOS =========
+    if any(TEXTS[x]["register"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/3")
+        return
+
+    if any(TEXTS[x]["trade"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/4")
+        return
+
+
+    # ========= BACK =========
+    if any(TEXTS[x]["back"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
+        return
+
+
     # ==================================================
     # =============== USER → GROUP ======================
     # ==================================================
@@ -70,7 +102,6 @@ async def router(message: types.Message):
 
         problem_type = users_thread[uid]
 
-        # 🔥 1) HEADER
         header = (
             f"📩 YANGI MUAMMO\n\n"
             f"👤 {message.from_user.full_name}\n"
@@ -79,8 +110,6 @@ async def router(message: types.Message):
         )
 
         await bot.send_message(GROUP_ID, header)
-
-        # 🔥 2) USER MESSAGE FORWARD (reply shu yerga qilinadi)
         await message.forward(GROUP_ID)
 
         await message.answer(TEXTS[l]["sent"])
@@ -99,10 +128,7 @@ async def admin_reply(message: types.Message):
     if not forwarded:
         return
 
-    await bot.send_message(
-        forwarded.id,
-        f"💬 Admin:\n{message.text}"
-    )
+    await bot.send_message(forwarded.id, f"💬 Admin:\n{message.text}")
 
 
 # ================= RUN =================
