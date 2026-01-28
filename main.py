@@ -69,36 +69,22 @@ async def router(message: types.Message):
         return
 
 
-    # ========= VIDEOS =========
-    if any(TEXTS[x]["register"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/3")
-        return
-
-    if any(TEXTS[x]["trade"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/4")
-        return
-
-
-    # ========= BACK =========
-    if any(TEXTS[x]["back"] == text for x in TEXTS):
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
-        return
-
-
     # ==================================================
-    # =============== SEND TO GROUP =====================
+    # =============== USER → GROUP ======================
     # ==================================================
     if uid in users_thread:
 
-        send_text = (
-            f"📩 YANGI MUAMMO\n\n"
+        # HEADER (info)
+        header = (
+            f"📩 YANGI MUAMMO\n"
             f"👤 {message.from_user.full_name}\n"
-            f"🆔 ID: {uid}\n"
-            f"🔗 @{message.from_user.username or 'yo‘q'}\n\n"
-            f"💬 {text}"
+            f"🆔 {uid}"
         )
 
-        await bot.send_message(GROUP_ID, send_text)
+        await bot.send_message(GROUP_ID, header)
+
+        # 🔥 ENG MUHIM → FORWARD
+        await message.forward(GROUP_ID)
 
         await message.answer(TEXTS[l]["sent"])
         users_thread.pop(uid, None)
@@ -111,18 +97,13 @@ async def router(message: types.Message):
 # ==================================================
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
-    try:
-        original = message.reply_to_message.text
 
-        if "ID:" not in original:
-            return
+    forwarded = message.reply_to_message.forward_from
 
-        user_id = int(original.split("ID: ")[1].split("\n")[0])
+    if not forwarded:
+        return
 
-        await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
-
-    except:
-        pass
+    await bot.send_message(forwarded.id, f"💬 Admin:\n{message.text}")
 
 
 # ================= RUN =================
