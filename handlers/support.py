@@ -4,11 +4,9 @@ from texts import TEXTS
 from keyboards import main_menu
 from db import add_ticket, get_user
 
-
-# ================= MEMORY =================
-users_thread = {}      # uid -> thread id
+users_thread = {}
+users_last_msg = {}
 users_lang = {}
-users_last_msg = {}    # reply uchun
 
 
 def register(dp):
@@ -17,9 +15,7 @@ def register(dp):
         return users_lang.get(uid, "uz")
 
 
-    # ==================================================
-    # ================= ADMIN REPLY =====================
-    # ==================================================
+    # ========= ADMIN REPLY =========
     @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
     async def admin_reply(message: types.Message):
 
@@ -30,13 +26,11 @@ def register(dp):
         await message.bot.send_message(
             user_id,
             f"👨‍💻 Admin javobi:\n{message.text}",
-            reply_to_message_id=users_last_msg.get(user_id)  # 🔥 reply style
+            reply_to_message_id=users_last_msg.get(user_id)
         )
 
 
-    # ==================================================
-    # ================= THREAD TANLASH ==================
-    # ==================================================
+    # ========= MUAMMO TANLASH =========
     @dp.message_handler(lambda m: any(
         TEXTS[x]["withdraw"] == m.text or
         TEXTS[x]["no_account"] == m.text or
@@ -47,48 +41,34 @@ def register(dp):
 
         uid = message.from_user.id
         text = message.text
-        l = lang(uid)
 
-        # 🔥 qaysi topic?
-        if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
+        if TEXTS["uz"]["withdraw"] == text:
             users_thread[uid] = WITHDRAW_THREAD
-
-        elif any(TEXTS[x]["no_account"] == text for x in TEXTS):
+        elif TEXTS["uz"]["no_account"] == text:
             users_thread[uid] = NO_ACCOUNT_THREAD
-
         else:
             users_thread[uid] = TECH_THREAD
 
-        await message.answer(TEXTS[l]["login_pass"])
+        await message.answer(TEXTS["uz"]["login_pass"])
 
 
-    # ==================================================
-    # ================= USER → THREAD ===================
-    # ==================================================
+    # ========= USER → GROUP =========
     @dp.message_handler(lambda m: m.from_user.id in users_thread)
     async def forward_problem(message: types.Message):
 
         uid = message.from_user.id
-        l = lang(uid)
         thread_id = users_thread[uid]
-
-        text = message.text or ""
 
         sent = await message.bot.send_message(
             chat_id=GROUP_ID,
-            text=(
-                f"📩 YANGI MUAMMO\n\n"
-                f"👤 {message.from_user.full_name}\n"
-                f"🆔 {uid}\n\n"
-                f"💬 {text}"
-            ),
-            message_thread_id=thread_id   # 🔥 MUHIM
+            text=f"👤 {message.from_user.full_name}\n🆔 {uid}\n\n{message.text}",
+            message_thread_id=int(thread_id)   # 🔥 MUHIM int()
         )
 
         add_ticket(uid, sent.message_id)
         users_last_msg[uid] = message.message_id
 
-        await message.answer(TEXTS[l]["sent"])
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
+        await message.answer(TEXTS["uz"]["sent"])
+        await message.answer(TEXTS["uz"]["menu"], reply_markup=main_menu("uz"))
 
         users_thread.pop(uid, None)
