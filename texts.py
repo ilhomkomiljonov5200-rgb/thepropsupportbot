@@ -17,23 +17,23 @@ TEXTS = {
         "problem_type": "❓ Muammo turi qanday?",
         "withdraw": "💸 Pul yechishda muammo",
         "no_account": "❌ To‘lov qildim, akkaunt berilmadi",
-        "tech": "⚠️ Hisob yoki dashboard ishlamayapti / hisob bloklandi",
+        "tech": "⚠️ Hisob yoki dashboard ishlamayapti / bloklangan",
         "back": "🔙 Ortga",
 
         "admin": "👨‍💻 Admin bilan bog‘lanish",
         "admin_msg": f"👨‍💻 Admin bilan bog‘laning:\n👉 {ADMIN_LINK}",
 
-        # 🔥 YANGILANGAN
+        # ✅ YANGI
         "login_pass": (
-            "📩 Iltimos, muammoingizni batafsil yozib qoldiring.\n\n"
-            "🔐 TheProp akkauntingiz login va parolini yuboring.\n\n"
+            "📩 Muammoingizni iloji boricha batafsil yozing.\n\n"
+            "🔐 Dashboard akkauntingiz login (gmail) va parolini ham yuboring.\n\n"
             "⚠️ Agar sizda 2-bosqichli (2FA) kod mavjud bo‘lsa, admin bilan bog‘laning:\n"
             f"👉 {ADMIN_LINK}"
         ),
 
         "video": "🎥 Video qo‘llanma 👇",
 
-        "sent": "✅ Yuborildi.\n⏳ Arizangiz 2 ish kun ichida ko‘rib chiqiladi."
+        "sent": "✅ Yuborildi.\n⏳ Arizangiz 2 ish kuni ichida ko‘rib chiqiladi."
     },
 
 
@@ -54,12 +54,12 @@ TEXTS = {
         "back": "🔙 Назад",
 
         "admin": "👨‍💻 Связаться с админом",
-        "admin_msg": f"👨‍💻 Свяжитесь с админом:\n👉 {ADMIN_LINK}",
+        "admin_msg": f"👨‍💻 Свяжитесь с администратором:\n👉 {ADMIN_LINK}",
 
-        # 🔥 YANGILANGAN
+        # ✅ YANGI
         "login_pass": (
             "📩 Пожалуйста, подробно опишите вашу проблему.\n\n"
-            "🔐 Отправьте логин и пароль аккаунта TheProp.\n\n"
+            "🔐 Отправьте логин (gmail) и пароль вашего Dashboard аккаунта.\n\n"
             "⚠️ Если включена двухэтапная защита (2FA), свяжитесь с администратором:\n"
             f"👉 {ADMIN_LINK}"
         ),
@@ -89,10 +89,10 @@ TEXTS = {
         "admin": "👨‍💻 Contact Admin",
         "admin_msg": f"👨‍💻 Contact the admin:\n👉 {ADMIN_LINK}",
 
-        # 🔥 YANGILANGAN
+        # ✅ YANGI
         "login_pass": (
-            "📩 Please describe your issue in detail.\n\n"
-            "🔐 Please send your TheProp account login and password.\n\n"
+            "📩 Please describe your issue in as much detail as possible.\n\n"
+            "🔐 Send your Dashboard account login (gmail) and password as well.\n\n"
             "⚠️ If 2FA is enabled, please contact the admin:\n"
             f"👉 {ADMIN_LINK}"
         ),
