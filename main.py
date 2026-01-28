@@ -4,14 +4,13 @@ from aiogram.utils import executor
 from config import *
 from texts import TEXTS, CHOOSE_ALL
 from keyboards import lang_keyboard, main_menu, problem_menu
-
 from handlers import support
 
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-# 🔥 support handlerlar ulanishi SHART
+# 🔥 ENG MUHIM — support birinchi ulanadi
 support.register(dp)
 
 
@@ -23,12 +22,12 @@ def lang(uid):
 
 
 # ================= START =================
-@dp.message_handler(commands=["start"])
+@dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
-# 🔥 FAQAT PRIVATE ROUTER (ENG MUHIM)
+# ================= ROUTER (FAQAT PRIVATE) =================
 @dp.message_handler(lambda m: m.chat.type == "private")
 async def router(message: types.Message):
 
@@ -39,14 +38,31 @@ async def router(message: types.Message):
     text = message.text
     l = lang(uid)
 
+
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
+
+    if any(TEXTS[x]["change"] == text for x in TEXTS):
+        await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
+        return
+
+
+    if any(TEXTS[x]["admin"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["admin_msg"])
+        return
+
+
     if any(TEXTS[x]["help"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
+        return
+
+
+    if any(TEXTS[x]["back"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
