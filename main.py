@@ -1,104 +1,89 @@
-import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils import executor
 
 from config import *
-from texts import TEXTS
+from texts import TEXTS, CHOOSE_ALL
+from keyboards import lang_keyboard, main_menu, problem_menu
 
-logging.basicConfig(level=logging.INFO)
+from handlers import support   # 🔥 YANGI
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-
-# ========= MEMORY =========
 users_lang = {}
-users_thread = {}
-users_last_msg = {}
 
 
 def lang(uid):
     return users_lang.get(uid, "uz")
 
 
-# ========= START =========
-@dp.message_handler(commands=["start"])
+# 🔥 support handlerlarni ulash
+support.register(dp)
+
+
+# ================= START =================
+@dp.message_handler(commands=['start'])
 async def start(message: types.Message):
-    users_lang[message.from_user.id] = "uz"
-    await message.answer(TEXTS["uz"]["menu"])
+    await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
-# ========= PROBLEM TYPE =========
-@dp.message_handler(lambda m: m.text in [
-    TEXTS["uz"]["withdraw"],
-    TEXTS["uz"]["no_account"],
-    TEXTS["uz"]["tech"]
-])
-async def choose_problem(message: types.Message):
+# ================= UNIVERSAL ROUTER =================
+@dp.message_handler()
+async def router(message: types.Message):
+
+    if message.chat.id == GROUP_ID:
+        return
+
+    if not message.text:
+        return
+
     uid = message.from_user.id
-    t = TEXTS[lang(uid)]
-
-    if message.text == t["withdraw"]:
-        users_thread[uid] = WITHDRAW_THREAD
-
-    elif message.text == t["no_account"]:
-        users_thread[uid] = NO_ACCOUNT_THREAD
-
-    else:
-        users_thread[uid] = TECH_THREAD
-
-    await message.answer(t["login_pass"])
+    text = message.text
+    l = lang(uid)
 
 
-# ========= USER SEND MESSAGE =========
-@dp.message_handler(content_types=types.ContentTypes.ANY)
-async def forward_problem(message: types.Message):
-    uid = message.from_user.id
-
-    if uid not in users_thread:
+    # LANGUAGE
+    if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
+        l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
+        users_lang[uid] = l
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
-    thread_id = users_thread[uid]
-    t = TEXTS[lang(uid)]
 
-    caption = (
-        f"📩 YANGI MUROJAAT\n\n"
-        f"👤 User: {message.from_user.full_name}\n"
-        f"🆔 ID: {uid}\n\n"
-        f"💬 Muammo:\n{message.text or ''}"
-    )
-
-    sent = await bot.send_message(
-        chat_id=GROUP_ID,
-        text=caption,
-        message_thread_id=thread_id   # 🔥 MUHIM
-    )
-
-    users_last_msg[uid] = sent.message_id
-
-    await message.answer(t["sent"])
-
-
-# ========= ADMIN REPLY =========
-@dp.message_handler(lambda m: m.chat.id == GROUP_ID)
-async def admin_reply(message: types.Message):
-    if not message.reply_to_message:
+    # CHANGE LANGUAGE
+    if any(TEXTS[x]["change"] == text for x in TEXTS):
+        await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
-    text = message.reply_to_message.text
 
-    if "ID:" not in text:
+    # ADMIN LINK
+    if any(TEXTS[x]["admin"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
-    uid = int(text.split("ID: ")[1].split("\n")[0])
 
-    await bot.send_message(
-        uid,
-        f"👨‍💻 Admin javobi:\n\n{message.text}",
-        reply_to_message_id=users_last_msg.get(uid)
-    )
+    # HELP
+    if any(TEXTS[x]["help"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
+        return
 
 
-# ========= RUN =========
+    # VIDEO
+    if any(TEXTS[x]["register"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/3")
+        return
+
+    if any(TEXTS[x]["trade"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/4")
+        return
+
+
+    # BACK
+    if any(TEXTS[x]["back"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
+        return
+
+
 if __name__ == "__main__":
+    print("BOT STARTED 🚀")
     executor.start_polling(dp, skip_updates=True)
