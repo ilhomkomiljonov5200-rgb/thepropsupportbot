@@ -46,57 +46,45 @@ async def router(message: types.Message):
         return
 
 
-    # ========= BUTTONS =========
-    if any(TEXTS[x]["change"] == text for x in TEXTS):
-        await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
+    # ========= THREAD TANLASH =========
+    if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
+        users_thread[uid] = "Withdraw"
+        await message.answer(TEXTS[l]["login_pass"])
         return
 
-    if any(TEXTS[x]["admin"] == text for x in TEXTS):
-        await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
+    if any(TEXTS[x]["no_account"] == text for x in TEXTS):
+        users_thread[uid] = "No account"
+        await message.answer(TEXTS[l]["login_pass"])
         return
 
-    if any(TEXTS[x]["help"] == text for x in TEXTS):
-        await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
-        return
-
-
-    # ========= THREAD BOSHLASH =========
-    if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
-       any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
-       any(TEXTS[x]["tech"] == text for x in TEXTS):
-
-        users_thread[uid] = True
+    if any(TEXTS[x]["tech"] == text for x in TEXTS):
+        users_thread[uid] = "Technical"
         await message.answer(TEXTS[l]["login_pass"])
         return
 
 
-    # ========= VIDEOS =========
-    if any(TEXTS[x]["register"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/3")
-        return
-
-    if any(TEXTS[x]["trade"] == text for x in TEXTS):
-        await message.answer("🎥 https://t.me/thepropvideo/4")
-        return
-
-
-    # ========= BACK =========
-    if any(TEXTS[x]["back"] == text for x in TEXTS):
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
-        return
-
-
     # ==================================================
-    # =============== USER → GROUP (FORWARD) ============
+    # =============== USER → GROUP ======================
     # ==================================================
     if uid in users_thread:
 
-        # 🔥 ENG MUHIM: forward qilamiz
+        problem_type = users_thread[uid]
+
+        # 🔥 1) HEADER
+        header = (
+            f"📩 YANGI MUAMMO\n\n"
+            f"👤 {message.from_user.full_name}\n"
+            f"🆔 {uid}\n"
+            f"📂 {problem_type}"
+        )
+
+        await bot.send_message(GROUP_ID, header)
+
+        # 🔥 2) USER MESSAGE FORWARD (reply shu yerga qilinadi)
         await message.forward(GROUP_ID)
 
         await message.answer(TEXTS[l]["sent"])
         users_thread.pop(uid, None)
-        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
@@ -105,21 +93,18 @@ async def router(message: types.Message):
 # ==================================================
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
-    try:
-        forwarded = message.reply_to_message.forward_from
 
-        if not forwarded:
-            return
+    forwarded = message.reply_to_message.forward_from
 
-        user_id = forwarded.id
+    if not forwarded:
+        return
 
-        await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
-
-    except Exception as e:
-        print("Reply error:", e)
+    await bot.send_message(
+        forwarded.id,
+        f"💬 Admin:\n{message.text}"
+    )
 
 
 # ================= RUN =================
 if __name__ == "__main__":
-    print("BOT STARTED 🚀")
     executor.start_polling(dp, skip_updates=True)
