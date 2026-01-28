@@ -5,15 +5,13 @@ from config import *
 from texts import TEXTS, CHOOSE_ALL
 from keyboards import lang_keyboard, main_menu, problem_menu
 
-# 🔥 support modul
 from handlers import support
 
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
 
-
-# 🔥 support handlerlarni ulash (ENG MUHIM)
+# 🔥 support handlerlarni ulash
 support.register(dp)
 
 
@@ -28,20 +26,17 @@ def lang(uid):
 # ==================================================
 # ================= START ==========================
 # ==================================================
-@dp.message_handler(commands=["start"])
+@dp.message_handler(commands=["start"], chat_type=["private"])
 async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
 # ==================================================
-# ================= UNIVERSAL ROUTER ===============
+# ================= ROUTER (PRIVATE ONLY) ==========
+# 🔥 ENG MUHIM — endi support bloklanmaydi
 # ==================================================
-@dp.message_handler()
+@dp.message_handler(chat_type=["private"])
 async def router(message: types.Message):
-
-    # 🔥 groupdagi message support handlerga tegishli
-    if message.chat.id == GROUP_ID:
-        return
 
     if not message.text:
         return
@@ -51,7 +46,7 @@ async def router(message: types.Message):
     l = lang(uid)
 
 
-    # ================= LANGUAGE =================
+    # LANGUAGE
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
@@ -59,25 +54,25 @@ async def router(message: types.Message):
         return
 
 
-    # ================= CHANGE LANGUAGE =========
+    # CHANGE LANGUAGE
     if any(TEXTS[x]["change"] == text for x in TEXTS):
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
 
-    # ================= ADMIN LINK ==============
+    # ADMIN LINK
     if any(TEXTS[x]["admin"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
 
-    # ================= HELP BUTTON =============
+    # HELP
     if any(TEXTS[x]["help"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
-    # ================= VIDEO ===================
+    # VIDEO
     if any(TEXTS[x]["register"] == text for x in TEXTS):
         await message.answer("🎥 https://t.me/thepropvideo/3")
         return
@@ -87,7 +82,7 @@ async def router(message: types.Message):
         return
 
 
-    # ================= BACK ====================
+    # BACK
     if any(TEXTS[x]["back"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
