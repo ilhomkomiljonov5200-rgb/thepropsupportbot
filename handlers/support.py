@@ -1,8 +1,11 @@
-from aiogram import types
+from aiogram.types import Message
+from aiogram import F
+
 from config import GROUP_ID, WITHDRAW_THREAD, NO_ACCOUNT_THREAD, TECH_THREAD
 from texts import TEXTS
 from keyboards import main_menu
 from db import add_ticket, get_user
+
 
 users_waiting = {}
 users_last_msg = {}
@@ -11,8 +14,8 @@ users_last_msg = {}
 def register(dp):
 
     # ================= ADMIN REPLY =================
-    @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
-    async def admin_reply(message: types.Message):
+    @dp.message(F.chat.id == GROUP_ID, F.reply_to_message)
+    async def admin_reply(message: Message):
 
         user_id = get_user(message.reply_to_message.message_id)
         if not user_id:
@@ -26,32 +29,39 @@ def register(dp):
 
 
     # ================= PROBLEM BUTTON =================
-    @dp.message_handler(lambda m: any(
-        TEXTS[x]["withdraw"] == m.text or
-        TEXTS[x]["no_account"] == m.text or
-        TEXTS[x]["tech"] == m.text
-        for x in TEXTS
-    ))
-    async def start_problem(message: types.Message):
+    @dp.message()
+    async def start_problem(message: Message):
+
+        text = message.text
+        if not text:
+            return
 
         uid = message.from_user.id
-        text = message.text
 
         if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
             users_waiting[uid] = WITHDRAW_THREAD
+
         elif any(TEXTS[x]["no_account"] == text for x in TEXTS):
             users_waiting[uid] = NO_ACCOUNT_THREAD
-        else:
+
+        elif any(TEXTS[x]["tech"] == text for x in TEXTS):
             users_waiting[uid] = TECH_THREAD
+
+        else:
+            return
 
         await message.answer(TEXTS["uz"]["login_pass"])
 
 
     # ================= USER → GROUP =================
-    @dp.message_handler(lambda m: m.from_user.id in users_waiting)
-    async def forward_problem(message: types.Message):
+    @dp.message()
+    async def forward_problem(message: Message):
 
         uid = message.from_user.id
+
+        if uid not in users_waiting:
+            return
+
         thread_id = users_waiting[uid]
 
         sent = await message.bot.send_message(

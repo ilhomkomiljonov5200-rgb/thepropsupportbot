@@ -1,5 +1,6 @@
-from aiogram import Bot, Dispatcher, types
-from aiogram.utils import executor
+import asyncio
+from aiogram import Bot, Dispatcher, F
+from aiogram.types import Message
 
 from config import *
 from texts import TEXTS, CHOOSE_ALL
@@ -8,7 +9,7 @@ from handlers import support
 
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 # 🔥 support handlerlarni birinchi ulaymiz (ENG MUHIM)
 support.register(dp)
@@ -24,16 +25,16 @@ def lang(uid):
 # ==================================================
 # ================= START ==========================
 # ==================================================
-@dp.message_handler(commands=["start"])
-async def start(message: types.Message):
+@dp.message(F.text == "/start")
+async def start(message: Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
 # ==================================================
 # ================= UNIVERSAL ROUTER ===============
 # ==================================================
-@dp.message_handler(lambda m: m.chat.type == "private")
-async def router(message: types.Message):
+@dp.message(F.chat.type == "private")
+async def router(message: Message):
 
     if not message.text:
         return
@@ -88,6 +89,10 @@ async def router(message: types.Message):
 # ==================================================
 # ================= RUN ============================
 # ==================================================
-if __name__ == "__main__":
+async def main():
     print("BOT STARTED 🚀")
-    executor.start_polling(dp, skip_updates=True)
+    await dp.start_polling(bot)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
