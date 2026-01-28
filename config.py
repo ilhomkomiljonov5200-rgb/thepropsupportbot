@@ -21,6 +21,3 @@ TECH_THREAD = 444          # ⚠️ Hisob/Dashboard ishlamay
 
 # ================= ADMIN =================
 ADMIN_LINK = "https://t.me/thepropsupportuzb"
-
-
-8361728289:AAEmS7GxROeyyy1r_t0Bo8vLB8UJ6uSt6aY
