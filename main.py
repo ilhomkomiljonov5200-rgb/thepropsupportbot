@@ -5,7 +5,7 @@ from config import *
 from texts import TEXTS, CHOOSE_ALL
 from keyboards import lang_keyboard, main_menu, problem_menu
 
-from db import add_ticket, get_user   # 🔥 DB
+from db import add_ticket, get_user
 
 
 bot = Bot(token=TOKEN)
@@ -15,23 +15,19 @@ users_lang = {}
 users_thread = {}
 
 
-# ==================================================
-# LANG
-# ==================================================
+# ================= LANG =================
 def lang(uid):
     return users_lang.get(uid, "uz")
 
 
-# ==================================================
-# START
-# ==================================================
+# ================= START =================
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
 # ==================================================
-# UNIVERSAL ROUTER
+# ================= UNIVERSAL ======================
 # ==================================================
 @dp.message_handler()
 async def router(message: types.Message):
@@ -44,7 +40,7 @@ async def router(message: types.Message):
     l = lang(uid)
 
 
-    # ================= LANGUAGE =================
+    # ========= LANGUAGE =========
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
@@ -52,80 +48,76 @@ async def router(message: types.Message):
         return
 
 
-    # ================= CHANGE LANGUAGE =================
-    if any(TEXTS[x]["change"] == text for x in TEXTS):
+    # ========= BUTTONS =========
+    if text == TEXTS[l]["change"]:
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
-
-    # ================= ADMIN LINK =================
-    if any(TEXTS[x]["admin"] == text for x in TEXTS):
+    if text == TEXTS[l]["admin"]:
         await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
-
-    # ================= HELP MENU =================
-    if any(TEXTS[x]["help"] == text for x in TEXTS):
+    if text == TEXTS[l]["help"]:
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
-    # ================= VIDEOS =================
-    if any(TEXTS[x]["register"] == text for x in TEXTS):
+    # ========= VIDEOS =========
+    if text == TEXTS[l]["register"]:
         await message.answer("🎥 https://t.me/thepropvideo/3")
         return
 
-    if any(TEXTS[x]["trade"] == text for x in TEXTS):
+    if text == TEXTS[l]["trade"]:
         await message.answer("🎥 https://t.me/thepropvideo/4")
         return
 
 
-    # ================= THREAD START =================
-    if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
-       any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
-       any(TEXTS[x]["tech"] == text for x in TEXTS):
-
+    # ========= THREAD START =========
+    if text in [
+        TEXTS[l]["withdraw"],
+        TEXTS[l]["no_account"],
+        TEXTS[l]["tech"]
+    ]:
         users_thread[uid] = True
         await message.answer(TEXTS[l]["login_pass"])
         return
 
 
-    # ================= BACK =================
-    if any(TEXTS[x]["back"] == text for x in TEXTS):
+    # ========= BACK =========
+    if text == TEXTS[l]["back"]:
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
     # ==================================================
-    # USER → GROUP (TICKET CREATE)
+    # =============== USER → GROUP ======================
     # ==================================================
     if uid in users_thread:
 
-        header = (
+        msg = (
             f"📩 YANGI MUAMMO\n\n"
             f"👤 {message.from_user.full_name}\n"
             f"🆔 {uid}\n\n"
             f"💬 {text}"
         )
 
-        sent = await bot.send_message(GROUP_ID, header)
+        sent = await bot.send_message(GROUP_ID, msg)
 
-        # 🔥 DBga saqlaymiz (message_id → user)
+        # 🔥 ENG MUHIM JOY
         add_ticket(uid, sent.message_id)
 
         await message.answer(TEXTS[l]["sent"])
-        users_thread.pop(uid, None)
+        users_thread.pop(uid)
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
 # ==================================================
-# 🔥 ADMIN REPLY SYSTEM (DB asosida)
+# =============== 🔥 REPLY SYSTEM ==================
 # ==================================================
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
 
-    # 🔥 header message_id orqali userni topamiz
     user_id = get_user(message.reply_to_message.message_id)
 
     if not user_id:
@@ -134,9 +126,7 @@ async def admin_reply(message: types.Message):
     await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
 
 
-# ==================================================
-# RUN
-# ==================================================
+# ================= RUN =================
 if __name__ == "__main__":
     print("BOT STARTED 🚀")
     executor.start_polling(dp, skip_updates=True)
