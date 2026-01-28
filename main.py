@@ -13,6 +13,7 @@ users_lang = {}
 users_thread = {}
 
 
+# ================= HELPERS =================
 def lang(uid):
     return users_lang.get(uid, "uz")
 
@@ -59,7 +60,7 @@ async def router(message: types.Message):
         return
 
 
-    # ========= THREAD =========
+    # ========= THREAD BOSHLASH =========
     if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
        any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
        any(TEXTS[x]["tech"] == text for x in TEXTS):
@@ -86,19 +87,12 @@ async def router(message: types.Message):
 
 
     # ==================================================
-    # =============== SEND TO GROUP =====================
+    # =============== USER → GROUP (FORWARD) ============
     # ==================================================
     if uid in users_thread:
 
-        send_text = (
-            f"📩 YANGI MUAMMO\n\n"
-            f"👤 {message.from_user.full_name}\n"
-            f"🆔 ID: {uid}\n"
-            f"🔗 @{message.from_user.username or 'yo‘q'}\n\n"
-            f"💬 {text}"
-        )
-
-        await bot.send_message(GROUP_ID, send_text)
+        # 🔥 ENG MUHIM: forward qilamiz
+        await message.forward(GROUP_ID)
 
         await message.answer(TEXTS[l]["sent"])
         users_thread.pop(uid, None)
@@ -112,17 +106,17 @@ async def router(message: types.Message):
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
     try:
-        original = message.reply_to_message.text
+        forwarded = message.reply_to_message.forward_from
 
-        if "ID:" not in original:
+        if not forwarded:
             return
 
-        user_id = int(original.split("ID: ")[1].split("\n")[0])
+        user_id = forwarded.id
 
         await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
 
-    except:
-        pass
+    except Exception as e:
+        print("Reply error:", e)
 
 
 # ================= RUN =================
