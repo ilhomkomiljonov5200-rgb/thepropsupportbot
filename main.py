@@ -5,6 +5,8 @@ from config import *
 from texts import TEXTS, CHOOSE_ALL
 from keyboards import lang_keyboard, main_menu, problem_menu
 
+from db import add_ticket, get_user   # 🔥 DB
+
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher(bot)
@@ -13,6 +15,7 @@ users_lang = {}
 users_thread = {}
 
 
+# ================= LANG =================
 def lang(uid):
     return users_lang.get(uid, "uz")
 
@@ -59,7 +62,7 @@ async def router(message: types.Message):
         return
 
 
-    # ========= THREAD =========
+    # ========= THREAD START =========
     if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
        any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
        any(TEXTS[x]["tech"] == text for x in TEXTS):
@@ -69,22 +72,29 @@ async def router(message: types.Message):
         return
 
 
+    # ========= BACK =========
+    if any(TEXTS[x]["back"] == text for x in TEXTS):
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
+        return
+
+
     # ==================================================
     # =============== USER → GROUP ======================
     # ==================================================
     if uid in users_thread:
 
-        # HEADER (info)
         header = (
-            f"📩 YANGI MUAMMO\n"
+            f"📩 YANGI MUAMMO\n\n"
             f"👤 {message.from_user.full_name}\n"
-            f"🆔 {uid}"
+            f"🆔 {uid}\n\n"
+            f"💬 {text}"
         )
 
-        await bot.send_message(GROUP_ID, header)
+        # 🔥 GROUPGA YUBORAMIZ
+        sent = await bot.send_message(GROUP_ID, header)
 
-        # 🔥 ENG MUHIM → FORWARD
-        await message.forward(GROUP_ID)
+        # 🔥 DBga yozamiz (ENG MUHIM)
+        add_ticket(uid, sent.message_id)
 
         await message.answer(TEXTS[l]["sent"])
         users_thread.pop(uid, None)
@@ -98,12 +108,13 @@ async def router(message: types.Message):
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
 
-    forwarded = message.reply_to_message.forward_from
+    # 🔥 DBdan userni topamiz
+    user_id = get_user(message.reply_to_message.message_id)
 
-    if not forwarded:
+    if not user_id:
         return
 
-    await bot.send_message(forwarded.id, f"💬 Admin:\n{message.text}")
+    await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
 
 
 # ================= RUN =================
