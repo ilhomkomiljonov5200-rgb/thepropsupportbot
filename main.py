@@ -15,19 +15,23 @@ users_lang = {}
 users_thread = {}
 
 
-# ================= LANG =================
+# ==================================================
+# LANG
+# ==================================================
 def lang(uid):
     return users_lang.get(uid, "uz")
 
 
-# ================= START =================
+# ==================================================
+# START
+# ==================================================
 @dp.message_handler(commands=['start'])
 async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
 # ==================================================
-# ================= UNIVERSAL ======================
+# UNIVERSAL ROUTER
 # ==================================================
 @dp.message_handler()
 async def router(message: types.Message):
@@ -40,7 +44,7 @@ async def router(message: types.Message):
     l = lang(uid)
 
 
-    # ========= LANGUAGE =========
+    # ================= LANGUAGE =================
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
@@ -48,21 +52,35 @@ async def router(message: types.Message):
         return
 
 
-    # ========= BUTTONS =========
+    # ================= CHANGE LANGUAGE =================
     if any(TEXTS[x]["change"] == text for x in TEXTS):
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
+
+    # ================= ADMIN LINK =================
     if any(TEXTS[x]["admin"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
+
+    # ================= HELP MENU =================
     if any(TEXTS[x]["help"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
-    # ========= THREAD START =========
+    # ================= VIDEOS =================
+    if any(TEXTS[x]["register"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/3")
+        return
+
+    if any(TEXTS[x]["trade"] == text for x in TEXTS):
+        await message.answer("🎥 https://t.me/thepropvideo/4")
+        return
+
+
+    # ================= THREAD START =================
     if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
        any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
        any(TEXTS[x]["tech"] == text for x in TEXTS):
@@ -72,14 +90,14 @@ async def router(message: types.Message):
         return
 
 
-    # ========= BACK =========
+    # ================= BACK =================
     if any(TEXTS[x]["back"] == text for x in TEXTS):
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
     # ==================================================
-    # =============== USER → GROUP ======================
+    # USER → GROUP (TICKET CREATE)
     # ==================================================
     if uid in users_thread:
 
@@ -90,10 +108,9 @@ async def router(message: types.Message):
             f"💬 {text}"
         )
 
-        # 🔥 GROUPGA YUBORAMIZ
         sent = await bot.send_message(GROUP_ID, header)
 
-        # 🔥 DBga yozamiz (ENG MUHIM)
+        # 🔥 DBga saqlaymiz (message_id → user)
         add_ticket(uid, sent.message_id)
 
         await message.answer(TEXTS[l]["sent"])
@@ -103,12 +120,12 @@ async def router(message: types.Message):
 
 
 # ==================================================
-# =============== 🔥 REPLY SYSTEM ==================
+# 🔥 ADMIN REPLY SYSTEM (DB asosida)
 # ==================================================
 @dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
 async def admin_reply(message: types.Message):
 
-    # 🔥 DBdan userni topamiz
+    # 🔥 header message_id orqali userni topamiz
     user_id = get_user(message.reply_to_message.message_id)
 
     if not user_id:
@@ -117,7 +134,9 @@ async def admin_reply(message: types.Message):
     await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
 
 
-# ================= RUN =================
+# ==================================================
+# RUN
+# ==================================================
 if __name__ == "__main__":
     print("BOT STARTED 🚀")
     executor.start_polling(dp, skip_updates=True)
