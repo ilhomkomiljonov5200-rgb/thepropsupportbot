@@ -4,8 +4,8 @@ conn = sqlite3.connect("support.db")
 cur = conn.cursor()
 
 cur.execute("""
-CREATE TABLE IF NOT EXISTS tickets (
-    group_msg_id INTEGER PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS tickets(
+    group_msg_id INTEGER,
     user_id INTEGER
 )
 """)
@@ -14,7 +14,7 @@ conn.commit()
 
 def add_ticket(user_id, group_msg_id):
     cur.execute(
-        "INSERT OR REPLACE INTO tickets VALUES (?, ?)",
+        "INSERT INTO tickets VALUES(?, ?)",
         (group_msg_id, user_id)
     )
     conn.commit()
