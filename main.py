@@ -23,8 +23,9 @@ async def start(message: types.Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
 
-# ================= UNIVERSAL HANDLER =================
-# 🔥 hech qanday filter yo‘q → hammasi ishlaydi
+# ==================================================
+# ================= UNIVERSAL ======================
+# ==================================================
 @dp.message_handler()
 async def router(message: types.Message):
 
@@ -58,18 +59,11 @@ async def router(message: types.Message):
         return
 
 
-    # ========= THREAD TANLASH =========
-    if any(TEXTS[x]["withdraw"] == text for x in TEXTS):
-        users_thread[uid] = True
-        await message.answer(TEXTS[l]["login_pass"])
-        return
+    # ========= THREAD =========
+    if any(TEXTS[x]["withdraw"] == text for x in TEXTS) or \
+       any(TEXTS[x]["no_account"] == text for x in TEXTS) or \
+       any(TEXTS[x]["tech"] == text for x in TEXTS):
 
-    if any(TEXTS[x]["no_account"] == text for x in TEXTS):
-        users_thread[uid] = True
-        await message.answer(TEXTS[l]["login_pass"])
-        return
-
-    if any(TEXTS[x]["tech"] == text for x in TEXTS):
         users_thread[uid] = True
         await message.answer(TEXTS[l]["login_pass"])
         return
@@ -99,11 +93,11 @@ async def router(message: types.Message):
         send_text = (
             f"📩 YANGI MUAMMO\n\n"
             f"👤 {message.from_user.full_name}\n"
-            f"🆔 {uid}\n\n"
+            f"🆔 ID: {uid}\n"
+            f"🔗 @{message.from_user.username or 'yo‘q'}\n\n"
             f"💬 {text}"
         )
 
-        # 🔥 aiogram 2 uchun oddiy send
         await bot.send_message(GROUP_ID, send_text)
 
         await message.answer(TEXTS[l]["sent"])
@@ -112,7 +106,26 @@ async def router(message: types.Message):
         return
 
 
+# ==================================================
+# =============== 🔥 REPLY SYSTEM ==================
+# ==================================================
+@dp.message_handler(lambda m: m.chat.id == GROUP_ID and m.reply_to_message)
+async def admin_reply(message: types.Message):
+    try:
+        original = message.reply_to_message.text
+
+        if "ID:" not in original:
+            return
+
+        user_id = int(original.split("ID: ")[1].split("\n")[0])
+
+        await bot.send_message(user_id, f"💬 Admin:\n{message.text}")
+
+    except:
+        pass
+
+
 # ================= RUN =================
 if __name__ == "__main__":
     print("BOT STARTED 🚀")
-    executor.start_polling(dp)   # ❌ skip_updates yo‘q
+    executor.start_polling(dp, skip_updates=True)
