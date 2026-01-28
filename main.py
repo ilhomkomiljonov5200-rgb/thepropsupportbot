@@ -1,6 +1,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
+from aiogram.filters import CommandStart
 
 from config import *
 from texts import TEXTS, CHOOSE_ALL
@@ -11,7 +12,7 @@ from handlers import support
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
 
-# 🔥 support handlerlarni birinchi ulaymiz (ENG MUHIM)
+# 🔥 support handlerlarni birinchi ulaymiz
 support.register(dp)
 
 
@@ -25,7 +26,7 @@ def lang(uid):
 # ==================================================
 # ================= START ==========================
 # ==================================================
-@dp.message(F.text == "/start")
+@dp.message(CommandStart())  # ✅ 3.x uchun to‘g‘ri
 async def start(message: Message):
     await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
 
@@ -33,11 +34,8 @@ async def start(message: Message):
 # ==================================================
 # ================= UNIVERSAL ROUTER ===============
 # ==================================================
-@dp.message(F.chat.type == "private")
+@dp.message(F.chat.type == "private", F.text)  # ✅ faqat textlar
 async def router(message: Message):
-
-    if not message.text:
-        return
 
     uid = message.from_user.id
     text = message.text
@@ -53,35 +51,35 @@ async def router(message: Message):
 
 
     # ================= CHANGE LANGUAGE =========
-    if any(TEXTS[x]["change"] == text for x in TEXTS):
+    if text == TEXTS[l]["change"]:
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
 
     # ================= ADMIN LINK ==============
-    if any(TEXTS[x]["admin"] == text for x in TEXTS):
+    if text == TEXTS[l]["admin"]:
         await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
 
     # ================= HELP BUTTON =============
-    if any(TEXTS[x]["help"] == text for x in TEXTS):
+    if text == TEXTS[l]["help"]:
         await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
 
     # ================= VIDEO BUTTONS ===========
-    if any(TEXTS[x]["register"] == text for x in TEXTS):
+    if text == TEXTS[l]["register"]:
         await message.answer("🎥 https://t.me/thepropvideo/3")
         return
 
-    if any(TEXTS[x]["trade"] == text for x in TEXTS):
+    if text == TEXTS[l]["trade"]:
         await message.answer("🎥 https://t.me/thepropvideo/4")
         return
 
 
     # ================= BACK ====================
-    if any(TEXTS[x]["back"] == text for x in TEXTS):
+    if text == TEXTS[l]["back"]:
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
