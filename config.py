@@ -3,10 +3,10 @@ import os
 
 # ================= BOT =================
 # Railway / server environment variable dan olinadi
-TOKEN = os.getenv("8361728289:AAEmS7GxROeyyy1r_t0Bo8vLB8UJ6uSt6aY")
+TOKEN = os.getenv("TOKEN")
 
 if not TOKEN:
-    raise ValueError("TOKEN topilmadi! Environment variable qo‘sh: TOKEN=xxxx")
+    raise ValueError("TOKEN topilmadi! Environment variable qo‘sh: TOKEN= ")
 
 
 # ================= GROUP =================
