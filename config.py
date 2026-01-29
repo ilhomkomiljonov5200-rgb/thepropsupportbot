@@ -1,22 +1,17 @@
-import os
-
-
 # ================= BOT =================
-# Railway / server environment variable dan olinadi
-TOKEN = os.getenv("TOKEN")
-
-if not TOKEN:
-    raise ValueError("TOKEN topilmadi! Environment variable qo‘sh: TOKEN= ")
+# 🔥 LOCAL TEST (VS Code)
+# Tokenni shu yerga yozamiz
+TOKEN = "8361728289:AAGNkF9zdtEao4Rff4w27aE0cV6vqbQ2WdM"
 
 
 # ================= GROUP =================
 GROUP_ID = -1003277084936
 
 
-# ================= TOPICS (THREADS) =================
-WITHDRAW_THREAD = 443      # 💸 Pul yechish
-NO_ACCOUNT_THREAD = 2      # ❌ To‘lov qildim akkaunt bermadi
-TECH_THREAD = 444          # ⚠️ Hisob/Dashboard ishlamay
+# ================= TOPICS =================
+WITHDRAW_THREAD = 443
+NO_ACCOUNT_THREAD = 2
+TECH_THREAD = 444
 
 
 # ================= ADMIN =================

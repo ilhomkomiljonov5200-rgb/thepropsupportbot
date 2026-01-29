@@ -1,104 +1,183 @@
 from config import ADMIN_LINK
 
+
+# 🌐 language choose text
 CHOOSE_ALL = "🇺🇿 Tilni tanlang / 🇷🇺 Выберите язык / 🇬🇧 Choose language"
+
 
 TEXTS = {
 
-    # ================= UZ =================
-    "uz": {
-        "menu": "Menu 👇",
+# =================================================
+# 🇺🇿 UZBEK
+# =================================================
+"uz": {
 
-        "register": "📋 ThePropdan ro‘yxatdan o‘tish",
-        "trade": "📊 TradeLockerga ulash va savdo qilish",
+    "menu": "Menu 👇",
+    "choose_lang": CHOOSE_ALL,
+    "problem_type": "❓ Muammo turini tanlang 👇",
 
-        "help": "⚠️ TheProp muammolari",
-        "change": "🌐 Tilni tanlash",
+    "register": "📋 ThePropdan ro‘yxatdan o‘tish",
+    "trade": "📊 TradeLockerga ulash va savdo qilish",
+    "problems": "🛠 TheProp muammolari",
+    "admin": "👨‍💻 Admin bilan bog‘lanish",
+    "lang": "🌐 Tilni almashtirish",
+    "back": "⬅️ Orqaga",
 
-        "problem_type": "❓ Muammo turi qanday?",
-        "withdraw": "💸 Pul yechishda muammo",
-        "no_account": "❌ To‘lov qildim, akkaunt berilmadi",
-        "tech": "⚠️ Hisob yoki dashboard ishlamayapti / bloklangan",
-        "back": "🔙 Ortga",
+    # ===== problem buttons =====
+    "withdraw": "💸 Pul yechishda muammo",
+    "payment": "❌ To‘lov qildim, akkaunt berilmadi",
+    "tech": "⚠️ Hisob yoki dashboard ishlamayapti / bloklangan",
 
-        "admin": "👨‍💻 Admin bilan bog‘lanish",
-        "admin_msg": f"👨‍💻 Admin bilan bog‘laning:\n👉 {ADMIN_LINK}",
+    # ===== support messages =====
+    "withdraw_msg": (
+        "📩 Iltimos, muammoingizni batafsil yozib qoldiring.\n"
+        "🔐 TheProp dashboard login va parolini yuboring.\n"
+        "⚠️ Agar 2FA mavjud bo‘lsa admin bilan bog‘laning:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
 
-        # ✅ YANGI
-        "login_pass": (
-            "📩 Muammoingizni iloji boricha batafsil yozing.\n\n"
-            "🔐 Dashboard akkauntingiz login (gmail) va parolini ham yuboring.\n\n"
-            "⚠️ Agar sizda 2-bosqichli (2FA) kod mavjud bo‘lsa, admin bilan bog‘laning:\n"
-            f"👉 {ADMIN_LINK}"
-        ),
+    "withdraw_done":
+        "✅ Ariza qabul qilindi.\n⏳ 3–6 soat ichida ko‘rib chiqiladi.",
 
-        "video": "🎥 Video qo‘llanma 👇",
+    "payment_msg": (
+        "🎥 https://t.me/thepropvideo/2\n\n"
+        "Videodagidek ro‘yxatdan o‘ting.\n\n"
+        "🔐 TheProp dashboard login va parolini yuboring.\n"
+        "⚠️ Agar 2FA mavjud bo‘lsa admin bilan bog‘laning:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
 
-        "sent": "✅ Yuborildi.\n⏳ Arizangiz 2 ish kuni ichida ko‘rib chiqiladi."
-    },
+    "payment_done":
+        "✅ Ariza yuborildi.\n⏳ 12 soat ichida ko‘rib chiqiladi.",
 
+    "tech_msg": (
+        "📩 Muammoni batafsil yozing.\n"
+        "🔐 TheProp dashboard login va parolini yuboring.\n"
+        "⚠️ Agar 2FA mavjud bo‘lsa admin bilan bog‘laning:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
 
-    # ================= RU =================
-    "ru": {
-        "menu": "Меню 👇",
+    "tech_done":
+        "✅ Ariza qabul qilindi.\n⏳ 12 soat ichida ko‘rib chiqiladi.",
 
-        "register": "📋 Регистрация через TheProp",
-        "trade": "📊 Подключение к TradeLocker и торговля",
-
-        "help": "⚠️ Проблемы TheProp",
-        "change": "🌐 Сменить язык",
-
-        "problem_type": "❓ Какой тип проблемы?",
-        "withdraw": "💸 Проблема с выводом средств",
-        "no_account": "❌ Оплатил, аккаунт не выдали",
-        "tech": "⚠️ Аккаунт или dashboard не работает / заблокирован",
-        "back": "🔙 Назад",
-
-        "admin": "👨‍💻 Связаться с админом",
-        "admin_msg": f"👨‍💻 Свяжитесь с администратором:\n👉 {ADMIN_LINK}",
-
-        # ✅ YANGI
-        "login_pass": (
-            "📩 Пожалуйста, подробно опишите вашу проблему.\n\n"
-            "🔐 Отправьте логин (gmail) и пароль вашего Dashboard аккаунта.\n\n"
-            "⚠️ Если включена двухэтапная защита (2FA), свяжитесь с администратором:\n"
-            f"👉 {ADMIN_LINK}"
-        ),
-
-        "video": "🎥 Видео инструкция 👇",
-
-        "sent": "✅ Отправлено.\n⏳ Ваша заявка будет рассмотрена в течение 2 рабочих дней."
-    },
+    # 🔥 NEW (admin reply)
+    "reply_title": "📩 Javob (Ticket",
+    "admin_label": "👨‍💻 Admin"
+},
 
 
-    # ================= EN =================
-    "en": {
-        "menu": "Menu 👇",
+# =================================================
+# 🇷🇺 RUSSIAN
+# =================================================
+"ru": {
 
-        "register": "📋 Register via TheProp",
-        "trade": "📊 Connect to TradeLocker & start trading",
+    "menu": "Меню 👇",
+    "choose_lang": CHOOSE_ALL,
+    "problem_type": "❓ Выберите тип проблемы 👇",
 
-        "help": "⚠️ TheProp Issues",
-        "change": "🌐 Change language",
+    "register": "📋 Регистрация через TheProp",
+    "trade": "📊 Подключение к TradeLocker",
+    "problems": "🛠 Проблемы TheProp",
+    "admin": "👨‍💻 Связаться с админом",
+    "lang": "🌐 Сменить язык",
+    "back": "⬅️ Назад",
 
-        "problem_type": "❓ What type of problem?",
-        "withdraw": "💸 Withdrawal problem",
-        "no_account": "❌ Paid but account not received",
-        "tech": "⚠️ Account or dashboard not working / blocked",
-        "back": "🔙 Back",
+    "withdraw": "💸 Проблема с выводом",
+    "payment": "❌ Оплатил, аккаунт не выдали",
+    "tech": "⚠️ Дашборд/аккаунт не работает",
 
-        "admin": "👨‍💻 Contact Admin",
-        "admin_msg": f"👨‍💻 Contact the admin:\n👉 {ADMIN_LINK}",
+    "withdraw_msg": (
+        "📩 Подробно опишите проблему.\n"
+        "🔐 Отправьте логин и пароль Dashboard.\n"
+        "⚠️ Если есть 2FA — свяжитесь с админом:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
 
-        # ✅ YANGI
-        "login_pass": (
-            "📩 Please describe your issue in as much detail as possible.\n\n"
-            "🔐 Send your Dashboard account login (gmail) and password as well.\n\n"
-            "⚠️ If 2FA is enabled, please contact the admin:\n"
-            f"👉 {ADMIN_LINK}"
-        ),
+    "withdraw_done":
+        "✅ Заявка принята.\n⏳ Рассмотрение 3–6 часов.",
 
-        "video": "🎥 Video guide 👇",
+    "payment_msg": (
+        "🎥 https://t.me/thepropvideo/2\n\n"
+        "Зарегистрируйтесь как в видео.\n\n"
+        "📩 Опишите проблему.\n"
+        "🔐 Отправьте логин и пароль Dashboard.\n"
+        "⚠️ Если есть 2FA — свяжитесь с админом:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
 
-        "sent": "✅ Sent.\n⏳ Your request will be reviewed within 2 business days."
-    }
+    "payment_done":
+        "✅ Заявка отправлена.\n⏳ Рассмотрение до 12 часов.",
+
+    "tech_msg": (
+        "📩 Опишите проблему подробно.\n"
+        "🔐 Отправьте логин и пароль Dashboard.\n"
+        "⚠️ Если есть 2FA — свяжитесь с админом:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
+
+    "tech_done":
+        "✅ Заявка принята.\n⏳ Рассмотрение до 12 часов.",
+
+    # 🔥 NEW
+    "reply_title": "📩 Ответ (Заявка",
+    "admin_label": "👨‍💻 Админ"
+},
+
+
+# =================================================
+# 🇬🇧 ENGLISH
+# =================================================
+"en": {
+
+    "menu": "Menu 👇",
+    "choose_lang": CHOOSE_ALL,
+    "problem_type": "❓ Choose problem type 👇",
+
+    "register": "📋 Register via TheProp",
+    "trade": "📊 Connect TradeLocker",
+    "problems": "🛠 TheProp issues",
+    "admin": "👨‍💻 Contact admin",
+    "lang": "🌐 Change language",
+    "back": "⬅️ Back",
+
+    "withdraw": "💸 Withdrawal problem",
+    "payment": "❌ Paid but account not received",
+    "tech": "⚠️ Dashboard/account not working",
+
+    "withdraw_msg": (
+        "📩 Please describe your issue in detail.\n"
+        "🔐 Send dashboard login & password.\n"
+        "⚠️ If 2FA enabled contact admin:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
+
+    "withdraw_done":
+        "✅ Request received.\n⏳ Review time: 3–6 hours.",
+
+    "payment_msg": (
+        "🎥 https://t.me/thepropvideo/2\n\n"
+        "Register as shown in the video.\n\n"
+        "📩 Describe your issue.\n"
+        "🔐 Send dashboard login & password.\n"
+        "⚠️ If 2FA enabled contact admin:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
+
+    "payment_done":
+        "✅ Request sent.\n⏳ Review time: up to 12 hours.",
+
+    "tech_msg": (
+        "📩 Describe the issue clearly.\n"
+        "🔐 Send dashboard login & password.\n"
+        "⚠️ If 2FA enabled contact admin:\n"
+        f"👉 {ADMIN_LINK}"
+    ),
+
+    "tech_done":
+        "✅ Request received.\n⏳ Review time: up to 12 hours.",
+
+    # 🔥 NEW
+    "reply_title": "📩 Reply (Ticket",
+    "admin_label": "👨‍💻 Admin"
+}
 }
