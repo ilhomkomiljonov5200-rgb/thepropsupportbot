@@ -1,36 +1,32 @@
 import asyncio
+import os
+
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 
-from config import TOKEN
 from texts import TEXTS, CHOOSE_ALL
 from keyboards import lang_keyboard, main_menu, problem_menu
 from handlers import support
 
 
-# ==================================================
-# BOT INIT
-# ==================================================
-bot = Bot(token=TOKEN)
+TOKEN = os.getenv("TOKEN")
+
+bot = Bot(TOKEN)
 dp = Dispatcher()
 
-# 🔥 support handlerlar (group/ticketlar)
+# 🔥 support handlerlarni ulaymiz
 support.register(dp)
 
-
-# ==================================================
-# MEMORY
-# ==================================================
 users_lang = {}
 
 
-def lang(uid: int):
+def lang(uid):
     return users_lang.get(uid, "uz")
 
 
 # ==================================================
-# START (HAR DOIM ISHLAYDI)
+# START
 # ==================================================
 @dp.message(CommandStart())
 async def start(message: Message):
@@ -38,61 +34,49 @@ async def start(message: Message):
 
 
 # ==================================================
-# ROUTER (FAQAT ODDIY TEXTLAR)
-# ❗ commandlarni ushlamaydi
+# UNIVERSAL ROUTER
 # ==================================================
-@dp.message(
-    F.chat.type == "private",
-    F.text,
-    ~F.text.startswith("/")   # 🔥 ENG MUHIM FIX
-)
+@dp.message(F.chat.type == "private", F.text)
 async def router(message: Message):
 
     uid = message.from_user.id
     text = message.text
     l = lang(uid)
-    t = TEXTS[l]
 
-
-    # ================= LANGUAGE =================
+    # LANGUAGE
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
         l = "uz" if "O‘zbek" in text else "ru" if "Русский" in text else "en"
         users_lang[uid] = l
         await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
-
-    # ================= CHANGE LANGUAGE =========
-    if text == t["change"]:
+    # CHANGE LANGUAGE
+    if text == TEXTS[l]["change"]:
         await message.answer(CHOOSE_ALL, reply_markup=lang_keyboard)
         return
 
-
-    # ================= ADMIN LINK ==============
-    if text == t["admin"]:
-        await message.answer(t["admin_msg"], disable_web_page_preview=True)
+    # ADMIN
+    if text == TEXTS[l]["admin"]:
+        await message.answer(TEXTS[l]["admin_msg"], disable_web_page_preview=True)
         return
 
-
-    # ================= HELP BUTTON =============
-    if text == t["help"]:
-        await message.answer(t["problem_type"], reply_markup=problem_menu(l))
+    # HELP
+    if text == TEXTS[l]["help"]:
+        await message.answer(TEXTS[l]["problem_type"], reply_markup=problem_menu(l))
         return
 
-
-    # ================= VIDEO BUTTONS ===========
-    if text == t["register"]:
+    # VIDEOS
+    if text == TEXTS[l]["register"]:
         await message.answer("🎥 https://t.me/thepropvideo/3")
         return
 
-    if text == t["trade"]:
+    if text == TEXTS[l]["trade"]:
         await message.answer("🎥 https://t.me/thepropvideo/4")
         return
 
-
-    # ================= BACK ====================
-    if text == t["back"]:
-        await message.answer(t["menu"], reply_markup=main_menu(l))
+    # BACK
+    if text == TEXTS[l]["back"]:
+        await message.answer(TEXTS[l]["menu"], reply_markup=main_menu(l))
         return
 
 
@@ -101,6 +85,10 @@ async def router(message: Message):
 # ==================================================
 async def main():
     print("BOT STARTED 🚀")
+
+    # 🔥🔥🔥 ENG MUHIM (Conflict/webhook fix)
+    await bot.delete_webhook(drop_pending_updates=True)
+
     await dp.start_polling(bot)
 
 
