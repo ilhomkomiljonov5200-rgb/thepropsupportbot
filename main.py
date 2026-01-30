@@ -73,6 +73,15 @@ def clear_state(uid):
     users_waiting.pop(uid, None)
 
 
+# 🔥 NEW — OPEN TICKET CHECK
+def has_open_ticket(uid):
+    row = db.cur.execute(
+        "SELECT id FROM tickets WHERE user_id=? AND status='open' LIMIT 1",
+        (uid,)
+    ).fetchone()
+    return row is not None
+
+
 # ================= START =================
 @dp.message(F.text == "/start")
 async def start(msg: Message):
@@ -163,6 +172,20 @@ async def handle(msg: Message):
 
 
     # =================================================
+    # 🔥 BLOCK NEW TICKET IF OLD ONE OPEN
+    # =================================================
+    wait_text = {
+        "uz": "⏳ Sizning arizangiz ko‘rib chiqilmoqda.\nIltimos sabr qiling.",
+        "ru": "⏳ Ваша заявка уже рассматривается.\nПожалуйста подождите.",
+        "en": "⏳ Your ticket is being reviewed.\nPlease wait."
+    }[lang]
+
+    if has_open_ticket(uid):
+        await msg.answer(wait_text)
+        return
+
+
+    # =================================================
     # PROBLEM BUTTONS
     # =================================================
     if text == t["withdraw"]:
@@ -182,7 +205,7 @@ async def handle(msg: Message):
 
 
     # =================================================
-    # FORWARD TO GROUP  ✅ MULTI-LANGUAGE FIX HERE
+    # FORWARD TO GROUP
     # =================================================
     if uid in users_waiting:
 
@@ -198,7 +221,6 @@ async def handle(msg: Message):
 
         db.add_message(ticket_id, "user", text)
 
-        # ✅ NEW: language-based confirm text
         confirm_text = {
             "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
             "ru": f"✅ Заявка #{ticket_id} принята\n\n",
@@ -257,110 +279,6 @@ async def admin_reply(msg: Message):
 
     await msg.reply("✅ Yuborildi va ticket yopildi")
 
-# =================================================
-# 📂 ADMIN — OCHIQ TICKETS
-# =================================================
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/ochiq"))
-async def open_tickets(msg: Message):
-
-    rows = db.cur.execute("""
-        SELECT id, user_id
-        FROM tickets
-        WHERE status='open'
-        ORDER BY id DESC
-    """).fetchall()
-
-    if not rows:
-        await msg.reply("✅ Ochiq ticket yo‘q")
-        return
-
-    text = "📂 Ochiq ticketlar:\n\n"
-
-    for r in rows:
-        text += f"🎫 #{r['id']} | 👤 {r['user_id']}\n"
-
-    await msg.reply(text)
-
-
-# =================================================
-# 📂 ADMIN — YOPILGAN TICKETS
-# =================================================
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/yopilgan"))
-async def closed_tickets(msg: Message):
-
-    rows = db.cur.execute("""
-        SELECT id, user_id
-        FROM tickets
-        WHERE status='closed'
-        ORDER BY id DESC
-    """).fetchall()
-
-    if not rows:
-        await msg.reply("❌ Yopilgan ticket yo‘q")
-        return
-
-    text = "📁 Yopilgan ticketlar:\n\n"
-
-    for r in rows:
-        text += f"🎫 #{r['id']} | 👤 {r['user_id']}\n"
-
-    await msg.reply(text)
-
-# =================================================
-# ✅ ADMIN COMMANDS (FIXED FOR @BOTNAME)
-# =================================================
-
-# ---------- CLOSE ----------
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("close"))
-async def close_ticket_cmd(msg: Message):
-
-    try:
-        ticket_id = int(msg.text.split()[1])
-    except:
-        await msg.reply("❌ Format: /close 5")
-        return
-
-    db.close_ticket(ticket_id)
-    await msg.reply(f"🔴 Ticket #{ticket_id} yopildi")
-
-
-# ---------- OPEN ----------
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("open"))
-async def open_ticket_cmd(msg: Message):
-
-    try:
-        ticket_id = int(msg.text.split()[1])
-    except:
-        await msg.reply("❌ Format: /open 5")
-        return
-
-    db.cur.execute(
-        "UPDATE tickets SET status='open' WHERE id=?",
-        (ticket_id,)
-    )
-    db.conn.commit()
-
-    await msg.reply(f"🟢 Ticket #{ticket_id} qayta ochildi")
-
-
-# ---------- STATS ----------
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("stats"))
-async def stats_cmd(msg: Message):
-
-    users = db.cur.execute("SELECT COUNT(*) FROM users").fetchone()[0]
-    total = db.cur.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
-    open_t = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='open'").fetchone()[0]
-    closed_t = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='closed'").fetchone()[0]
-
-    text = (
-        "📊 Statistika\n\n"
-        f"👤 Users: {users}\n"
-        f"🎫 Jami: {total}\n"
-        f"🟢 Ochiq: {open_t}\n"
-        f"🔴 Yopilgan: {closed_t}"
-    )
-
-    await msg.reply(text)
 
 # ================= RUN =================
 async def main():
