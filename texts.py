@@ -23,6 +23,9 @@ TEXTS = {
     "lang": "🌐 Tilni almashtirish",
     "back": "⬅️ Orqaga",
 
+    # 🔥 NEW (ticket kutish)
+    "wait_ticket": "⏳ Iltimos sabr qiling, avvalgi arizangiz hali ko‘rib chiqilmoqda.",
+
     # ===== problem buttons =====
     "withdraw": "💸 Pul yechishda muammo",
     "payment": "❌ To‘lov qildim, akkaunt berilmadi",
@@ -60,7 +63,6 @@ TEXTS = {
     "tech_done":
         "✅ Ariza qabul qilindi.\n⏳ 12 soat ichida ko‘rib chiqiladi.",
 
-    # 🔥 NEW (admin reply)
     "reply_title": "📩 Javob (Ticket",
     "admin_label": "👨‍💻 Admin"
 },
@@ -74,6 +76,9 @@ TEXTS = {
     "menu": "Меню 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Выберите тип проблемы 👇",
+
+    # 🔥 NEW
+    "wait_ticket": "⏳ Пожалуйста подождите, предыдущая заявка ещё рассматривается.",
 
     "register": "📋 Регистрация через TheProp",
     "trade": "📊 Подключение к TradeLocker",
@@ -118,7 +123,6 @@ TEXTS = {
     "tech_done":
         "✅ Заявка принята.\n⏳ Рассмотрение до 12 часов.",
 
-    # 🔥 NEW
     "reply_title": "📩 Ответ (Заявка",
     "admin_label": "👨‍💻 Админ"
 },
@@ -132,6 +136,9 @@ TEXTS = {
     "menu": "Menu 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Choose problem type 👇",
+
+    # 🔥 NEW
+    "wait_ticket": "⏳ Please wait, your previous request is still being reviewed.",
 
     "register": "📋 Register via TheProp",
     "trade": "📊 Connect TradeLocker",
@@ -158,8 +165,7 @@ TEXTS = {
         "🎥 https://t.me/thepropvideo/2\n\n"
         "Register as shown in the video.\n\n"
         "📩 Describe your issue.\n"
-        "🔐 Send dashboard login & password.\n"
-        "⚠️ If 2FA enabled contact admin:\n"
+        "🔐 Send login & password.\n"
         f"👉 {ADMIN_LINK}"
     ),
 
@@ -168,15 +174,13 @@ TEXTS = {
 
     "tech_msg": (
         "📩 Describe the issue clearly.\n"
-        "🔐 Send dashboard login & password.\n"
-        "⚠️ If 2FA enabled contact admin:\n"
+        "🔐 Send login & password.\n"
         f"👉 {ADMIN_LINK}"
     ),
 
     "tech_done":
         "✅ Request received.\n⏳ Review time: up to 12 hours.",
 
-    # 🔥 NEW
     "reply_title": "📩 Reply (Ticket",
     "admin_label": "👨‍💻 Admin"
 }

@@ -181,36 +181,42 @@ async def handle(msg: Message):
         return
 
 
-    # =================================================
-    # FORWARD TO GROUP  ✅ MULTI-LANGUAGE FIX HERE
-    # =================================================
-    if uid in users_waiting:
+  # =================================================
+# FORWARD TO GROUP  ✅ MULTI-LANGUAGE FIX HERE
+# =================================================
+if uid in users_waiting:
 
-        thread = users_waiting.pop(uid)
+    # 🔥 NEW ===== WAIT TICKET BLOCK =====
+    open_ticket = db.get_open_ticket(uid)
+    if open_ticket:
+     await msg.answer(t["wait_ticket"])
+      return
+    # 🔥 END NEW ==========================
 
-        ticket_id = db.create_ticket(uid, thread)
+    thread = users_waiting.pop(uid)
 
-        await bot.send_message(
-            GROUP_ID,
-            f"🎫 Ticket #{ticket_id}\n👤 {msg.from_user.full_name}\n🆔 {uid}\n\n{text}",
-            message_thread_id=thread
-        )
+    ticket_id = db.create_ticket(uid, thread)
 
-        db.add_message(ticket_id, "user", text)
+    await bot.send_message(
+        GROUP_ID,
+        f"🎫 Ticket #{ticket_id}\n👤 {msg.from_user.full_name}\n🆔 {uid}\n\n{text}",
+        message_thread_id=thread
+    )
 
-        # ✅ NEW: language-based confirm text
-        confirm_text = {
-            "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
-            "ru": f"✅ Заявка #{ticket_id} принята\n\n",
-            "en": f"✅ Ticket #{ticket_id} received\n\n"
-        }[lang]
+    db.add_message(ticket_id, "user", text)
 
-        if thread == WITHDRAW_THREAD:
-            await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
-        elif thread == NO_ACCOUNT_THREAD:
-            await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
-        else:
-            await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+    confirm_text = {
+        "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
+        "ru": f"✅ Заявка #{ticket_id} принята\n\n",
+        "en": f"✅ Ticket #{ticket_id} received\n\n"
+    }[lang]
+
+    if thread == WITHDRAW_THREAD:
+        await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
+    elif thread == NO_ACCOUNT_THREAD:
+        await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
+    else:
+        await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
 
 
 # =================================================
@@ -361,25 +367,6 @@ async def stats_cmd(msg: Message):
     )
 
     await msg.reply(text)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # ================= RUN =================
 async def main():
