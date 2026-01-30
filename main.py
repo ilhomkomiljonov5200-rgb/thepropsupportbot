@@ -10,7 +10,8 @@ from config import (
     ADMIN_LINK,
     WITHDRAW_THREAD,
     NO_ACCOUNT_THREAD,
-    TECH_THREAD
+    TECH_THREAD,
+    REMINDER_GROUP_ID
 )
 
 from texts import TEXTS, CHOOSE_ALL
@@ -73,13 +74,31 @@ def clear_state(uid):
     users_waiting.pop(uid, None)
 
 
-# 🔥 NEW — OPEN TICKET CHECK
+# 🔥 OPEN TICKET CHECK
 def has_open_ticket(uid):
     row = db.cur.execute(
         "SELECT id FROM tickets WHERE user_id=? AND status='open' LIMIT 1",
         (uid,)
     ).fetchone()
     return row is not None
+
+
+# ================= AUTO REMINDER (NEW) =================
+async def reminder_loop():
+    text = (
+        "📢 Eslatma!\n\n"
+        "❗ Muammo bormi?\n"
+        "👉 @thepropsupportbot ga murojaat qiling\n\n"
+        "Support 24/7 ishlaydi ✅"
+    )
+
+    while True:
+        try:
+            await bot.send_message(REMINDER_GROUP_ID, text)
+        except:
+            pass
+
+        await asyncio.sleep(900)  # 15 minut
 
 
 # ================= START =================
@@ -116,7 +135,6 @@ async def handle(msg: Message):
             lang = "uz"
 
         db.set_lang(uid, lang)
-
         await msg.answer(TEXTS[lang]["menu"], reply_markup=main_kb(lang))
         return
 
@@ -171,9 +189,7 @@ async def handle(msg: Message):
         return
 
 
-    # =================================================
-    # 🔥 BLOCK NEW TICKET IF OLD ONE OPEN
-    # =================================================
+    # ================= BLOCK IF OPEN =================
     wait_text = {
         "uz": "⏳ Sizning arizangiz ko‘rib chiqilmoqda.\nIltimos sabr qiling.",
         "ru": "⏳ Ваша заявка уже рассматривается.\nПожалуйста подождите.",
@@ -185,9 +201,7 @@ async def handle(msg: Message):
         return
 
 
-    # =================================================
-    # PROBLEM BUTTONS
-    # =================================================
+    # ================= PROBLEM BUTTONS =================
     if text == t["withdraw"]:
         users_waiting[uid] = WITHDRAW_THREAD
         await msg.answer(t["withdraw_msg"], disable_web_page_preview=True)
@@ -204,13 +218,10 @@ async def handle(msg: Message):
         return
 
 
-    # =================================================
-    # FORWARD TO GROUP
-    # =================================================
+    # ================= FORWARD =================
     if uid in users_waiting:
 
         thread = users_waiting.pop(uid)
-
         ticket_id = db.create_ticket(uid, thread)
 
         await bot.send_message(
@@ -235,9 +246,7 @@ async def handle(msg: Message):
             await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
 
 
-# =================================================
-# ADMIN REPLY SYSTEM
-# =================================================
+# ================= ADMIN REPLY =================
 @dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/reply"))
 async def admin_reply(msg: Message):
 
@@ -250,7 +259,6 @@ async def admin_reply(msg: Message):
         return
 
     user_id = db.get_user_by_ticket(ticket_id)
-
     if not user_id:
         await msg.reply("❌ Ticket topilmadi")
         return
@@ -282,6 +290,7 @@ async def admin_reply(msg: Message):
 
 # ================= RUN =================
 async def main():
+    asyncio.create_task(reminder_loop())  # 🔥 SHU QO‘SHILDI
     await dp.start_polling(bot)
 
 

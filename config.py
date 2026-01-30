@@ -6,6 +6,7 @@ TOKEN = "8361728289:AAGNkF9zdtEao4Rff4w27aE0cV6vqbQ2WdM"
 
 # ================= GROUP =================
 GROUP_ID = -1003277084936
+REMINDER_GROUP_ID = -1002293269329
 
 
 # ================= TOPICS =================
