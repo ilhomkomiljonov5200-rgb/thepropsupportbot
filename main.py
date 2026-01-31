@@ -18,7 +18,7 @@ from texts import TEXTS, CHOOSE_ALL
 from db import Database
 
 
-bot = Bot()
+bot = Bot(TOKEN)
 dp = Dispatcher()
 db = Database()
 
