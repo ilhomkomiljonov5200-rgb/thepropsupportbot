@@ -231,14 +231,31 @@ async def handle(msg: Message):
 
     await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
-    # 🔥 ENG TO‘G‘RI USUL
-    # Telegram o‘zi albumni to‘liq ko‘chiradi
-    await bot.copy_message(
-        chat_id=GROUP_ID,
-        from_chat_id=msg.chat.id,
-        message_id=msg.message_id,
-        message_thread_id=thread
-    )
+    # ===== MEDIA bo‘lsa (rasm/video/file) =====
+    if msg.photo or msg.video or msg.document or msg.audio or msg.voice or msg.sticker:
+
+        await bot.copy_message(
+            chat_id=GROUP_ID,
+            from_chat_id=msg.chat.id,
+            message_id=msg.message_id,
+            message_thread_id=thread
+        )
+
+        # caption bo‘lsa alohida yuboramiz
+        if msg.caption:
+            await bot.send_message(
+                GROUP_ID,
+                msg.caption,
+                message_thread_id=thread
+            )
+
+    # ===== oddiy text bo‘lsa =====
+    elif msg.text:
+        await bot.send_message(
+            GROUP_ID,
+            msg.text,
+            message_thread_id=thread
+        )
 
     content = msg.text or msg.caption or "[media]"
     db.add_message(ticket_id, "user", content)
