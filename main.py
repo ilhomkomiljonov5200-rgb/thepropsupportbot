@@ -218,35 +218,39 @@ async def handle(msg: Message):
         return
 
 
-    # ================= FORWARD =================
+  # ================= FORWARD =================
     if uid in users_waiting:
 
         thread = users_waiting.pop(uid)
     ticket_id = db.create_ticket(uid, thread)
 
-    # 🔥 Ticket header (info)
     header = (
         f"🎫 Ticket #{ticket_id}\n"
         f"👤 {msg.from_user.full_name}\n"
         f"🆔 {uid}"
     )
 
-    await bot.send_message(
-        GROUP_ID,
-        header,
-        message_thread_id=thread
-    )
+    await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
-    # 🔥 ENG MUHIM — media ham ishlaydi
-    await bot.copy_message(
-        chat_id=GROUP_ID,
-        from_chat_id=msg.chat.id,
-        message_id=msg.message_id,
-        message_thread_id=thread
-    )
+    # ========= 🔥 MEDIA GROUP SUPPORT =========
+    if msg.media_group_id:
+        # album bo‘lsa → hammasini ko‘chiradi
+        await bot.copy_messages(
+            chat_id=GROUP_ID,
+            from_chat_id=msg.chat.id,
+            message_ids=[msg.message_id],
+            message_thread_id=thread
+        )
+    else:
+        # oddiy message
+        await bot.copy_message(
+            chat_id=GROUP_ID,
+            from_chat_id=msg.chat.id,
+            message_id=msg.message_id,
+            message_thread_id=thread
+        )
 
-    # DB ga yozish
-    content = msg.text or "[media]"
+    content = msg.text or msg.caption or "[media]"
     db.add_message(ticket_id, "user", content)
 
     confirm_text = {
@@ -261,7 +265,6 @@ async def handle(msg: Message):
         await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
     else:
         await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
-
 
 # ================= ADMIN REPLY =================
 @dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/reply"))
