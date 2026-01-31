@@ -286,6 +286,87 @@ async def admin_reply(msg: Message):
     db.close_ticket(ticket_id)
 
     await msg.reply("✅ Yuborildi va ticket yopildi")
+# ================= ADMIN COMMANDS (NEW) =================
+
+# /stats
+@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("stats"))
+async def stats_cmd(msg: Message):
+
+    users = db.cur.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    open_tickets = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='open'").fetchone()[0]
+    closed = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='closed'").fetchone()[0]
+
+    await msg.reply(
+        f"📊 Statistika\n\n"
+        f"👤 Users: {users}\n"
+        f"🟢 Ochiq: {open_tickets}\n"
+        f"🔴 Yopilgan: {closed}"
+    )
+
+
+# /ochiq
+@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("ochiq"))
+async def open_list(msg: Message):
+
+    rows = db.cur.execute(
+        "SELECT id, user_id FROM tickets WHERE status='open' ORDER BY id DESC LIMIT 20"
+    ).fetchall()
+
+    if not rows:
+        return await msg.reply("Ochiq ticket yo‘q")
+
+    text = "🟢 Ochiq ticketlar:\n\n"
+
+    for t in rows:
+        text += f"#{t[0]} | {t[1]}\n"
+
+    await msg.reply(text)
+
+
+# /yopilgan
+@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("yopilgan"))
+async def closed_list(msg: Message):
+
+    rows = db.cur.execute(
+        "SELECT id, user_id FROM tickets WHERE status='closed' ORDER BY id DESC LIMIT 20"
+    ).fetchall()
+
+    if not rows:
+        return await msg.reply("Yopilgan ticket yo‘q")
+
+    text = "🔴 Yopilgan ticketlar:\n\n"
+
+    for t in rows:
+        text += f"#{t[0]} | {t[1]}\n"
+
+    await msg.reply(text)
+
+
+# /open 5
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/open "))
+async def reopen_ticket(msg: Message):
+    try:
+        ticket_id = int(msg.text.split()[1])
+    except:
+        return await msg.reply("❌ Format: /open 5")
+
+    db.cur.execute("UPDATE tickets SET status='open' WHERE id=?", (ticket_id,))
+    db.conn.commit()
+
+    await msg.reply(f"✅ Ticket #{ticket_id} qayta ochildi")
+
+
+# /close 5
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/close "))
+async def close_ticket_cmd(msg: Message):
+    try:
+        ticket_id = int(msg.text.split()[1])
+    except:
+        return await msg.reply("❌ Format: /close 5")
+
+    db.close_ticket(ticket_id)
+
+    await msg.reply(f"🔴 Ticket #{ticket_id} yopildi")
 
 
 # ================= RUN =================
