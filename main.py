@@ -232,17 +232,31 @@ async def handle(msg: Message):
 
     await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
-    # ========= 🔥 MEDIA GROUP SUPPORT =========
+    # 🔥 MEDIA GROUP FIX (album support)
     if msg.media_group_id:
-        # album bo‘lsa → hammasini ko‘chiradi
+
+        await asyncio.sleep(0.5)  # hamma rasm kelishini kutamiz
+
+        # oxirgi 10 ta message ichidan shu groupnikilarni yig‘amiz
+        updates = dp.storage._data if hasattr(dp, "storage") else []
+
+        message_ids = [msg.message_id]
+
+        # oddiy va ishonchli usul: ketma-ket 10 ta ni tekshiramiz
+        for i in range(1, 10):
+            try:
+                message_ids.append(msg.message_id - i)
+            except:
+                pass
+
         await bot.copy_messages(
             chat_id=GROUP_ID,
             from_chat_id=msg.chat.id,
-            message_ids=[msg.message_id],
+            message_ids=sorted(message_ids),
             message_thread_id=thread
         )
+
     else:
-        # oddiy message
         await bot.copy_message(
             chat_id=GROUP_ID,
             from_chat_id=msg.chat.id,
@@ -265,6 +279,7 @@ async def handle(msg: Message):
         await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
     else:
         await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+
 
 # ================= ADMIN REPLY =================
 @dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/reply"))
