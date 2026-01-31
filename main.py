@@ -222,28 +222,45 @@ async def handle(msg: Message):
     if uid in users_waiting:
 
         thread = users_waiting.pop(uid)
-        ticket_id = db.create_ticket(uid, thread)
+    ticket_id = db.create_ticket(uid, thread)
 
-        await bot.send_message(
-            GROUP_ID,
-            f"🎫 Ticket #{ticket_id}\n👤 {msg.from_user.full_name}\n🆔 {uid}\n\n{text}",
-            message_thread_id=thread
-        )
+    # 🔥 Ticket header (info)
+    header = (
+        f"🎫 Ticket #{ticket_id}\n"
+        f"👤 {msg.from_user.full_name}\n"
+        f"🆔 {uid}"
+    )
 
-        db.add_message(ticket_id, "user", text)
+    await bot.send_message(
+        GROUP_ID,
+        header,
+        message_thread_id=thread
+    )
 
-        confirm_text = {
-            "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
-            "ru": f"✅ Заявка #{ticket_id} принята\n\n",
-            "en": f"✅ Ticket #{ticket_id} received\n\n"
-        }[lang]
+    # 🔥 ENG MUHIM — media ham ishlaydi
+    await bot.copy_message(
+        chat_id=GROUP_ID,
+        from_chat_id=msg.chat.id,
+        message_id=msg.message_id,
+        message_thread_id=thread
+    )
 
-        if thread == WITHDRAW_THREAD:
-            await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
-        elif thread == NO_ACCOUNT_THREAD:
-            await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
-        else:
-            await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+    # DB ga yozish
+    content = msg.text or "[media]"
+    db.add_message(ticket_id, "user", content)
+
+    confirm_text = {
+        "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
+        "ru": f"✅ Заявка #{ticket_id} принята\n\n",
+        "en": f"✅ Ticket #{ticket_id} received\n\n"
+    }[lang]
+
+    if thread == WITHDRAW_THREAD:
+        await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
+    elif thread == NO_ACCOUNT_THREAD:
+        await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
+    else:
+        await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
 
 
 # ================= ADMIN REPLY =================
