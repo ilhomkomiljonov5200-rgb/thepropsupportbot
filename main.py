@@ -217,8 +217,7 @@ async def handle(msg: Message):
         await msg.answer(t["tech_msg"], disable_web_page_preview=True)
         return
 
-
-  # ================= FORWARD =================
+# ================= FORWARD =================
     if uid in users_waiting:
 
         thread = users_waiting.pop(uid)
@@ -232,37 +231,14 @@ async def handle(msg: Message):
 
     await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
-    # 🔥 MEDIA GROUP FIX (album support)
-    if msg.media_group_id:
-
-        await asyncio.sleep(0.5)  # hamma rasm kelishini kutamiz
-
-        # oxirgi 10 ta message ichidan shu groupnikilarni yig‘amiz
-        updates = dp.storage._data if hasattr(dp, "storage") else []
-
-        message_ids = [msg.message_id]
-
-        # oddiy va ishonchli usul: ketma-ket 10 ta ni tekshiramiz
-        for i in range(1, 10):
-            try:
-                message_ids.append(msg.message_id - i)
-            except:
-                pass
-
-        await bot.copy_messages(
-            chat_id=GROUP_ID,
-            from_chat_id=msg.chat.id,
-            message_ids=sorted(message_ids),
-            message_thread_id=thread
-        )
-
-    else:
-        await bot.copy_message(
-            chat_id=GROUP_ID,
-            from_chat_id=msg.chat.id,
-            message_id=msg.message_id,
-            message_thread_id=thread
-        )
+    # 🔥 ENG TO‘G‘RI USUL
+    # Telegram o‘zi albumni to‘liq ko‘chiradi
+    await bot.copy_message(
+        chat_id=GROUP_ID,
+        from_chat_id=msg.chat.id,
+        message_id=msg.message_id,
+        message_thread_id=thread
+    )
 
     content = msg.text or msg.caption or "[media]"
     db.add_message(ticket_id, "user", content)
@@ -279,6 +255,7 @@ async def handle(msg: Message):
         await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
     else:
         await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+
 
 
 # ================= ADMIN REPLY =================
