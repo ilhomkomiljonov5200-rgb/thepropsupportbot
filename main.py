@@ -18,7 +18,7 @@ from texts import TEXTS, CHOOSE_ALL
 from db import Database
 
 
-bot = Bot(TOKEN)
+bot = Bot(TOKEN2)
 dp = Dispatcher()
 db = Database()
 
@@ -98,7 +98,7 @@ async def reminder_loop():
         except:
             pass
 
-        await asyncio.sleep(900)  # 15 minut
+        await asyncio.sleep(3600)  # 1 soat
 
 
 # ================= START =================
