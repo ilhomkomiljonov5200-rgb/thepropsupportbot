@@ -16,6 +16,23 @@ TEXTS = {
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Muammo turini tanlang 👇",
 
+    # 🔥 NEW (pricing qo‘shildi)
+    "pricing": "💰 TheProp narxlari",
+
+    # 🔥 STEP SYSTEM (QO‘SHILDI)
+    "choose_category": "Kategoriyani tanlang 👇",
+    "choose_account": "Account tanlang 👇",
+    "one_step": "🚀 One Step",
+    "two_step": "🔥 Two Step",
+    "funded": "💎 Funded",
+
+    # 🔥 NEW BACK FOR MENU (QO‘SHILDI)
+    "back_menu": "⬅️ Bosh menyuga qaytish",
+
+    # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
+    "prices_title": "Paketni tanlang 👇",
+    "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+
     "register": "📋 ThePropdan ro‘yxatdan o‘tish",
     "trade": "📊 TradeLockerga ulash va savdo qilish",
     "problems": "🛠 TheProp muammolari",
@@ -23,15 +40,12 @@ TEXTS = {
     "lang": "🌐 Tilni almashtirish",
     "back": "⬅️ Orqaga",
 
-    # 🔥 NEW (ticket kutish)
     "wait_ticket": "⏳ Iltimos sabr qiling, avvalgi arizangiz hali ko‘rib chiqilmoqda.",
 
-    # ===== problem buttons =====
     "withdraw": "💸 Pul yechishda muammo",
     "payment": "❌ To‘lov qildim, akkaunt berilmadi",
     "tech": "⚠️ Hisob yoki dashboard ishlamayapti / bloklangan",
 
-    # ===== support messages =====
     "withdraw_msg": (
         "📩 Iltimos, muammoingizni batafsil yozib qoldiring.\n"
         "🔐 TheProp dashboard login va parolini yuboring.\n"
@@ -77,7 +91,22 @@ TEXTS = {
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Выберите тип проблемы 👇",
 
-    # 🔥 NEW
+    "pricing": "💰 Цены TheProp",
+
+    # 🔥 STEP SYSTEM (QO‘SHILDI)
+    "choose_category": "Выберите категорию 👇",
+    "choose_account": "Выберите аккаунт 👇",
+    "one_step": "🚀 One Step",
+    "two_step": "🔥 Two Step",
+    "funded": "💎 Funded",
+
+    # 🔥 NEW BACK FOR MENU (QO‘SHILDI)
+    "back_menu": "⬅️ В меню",
+
+    # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
+    "prices_title": "Выберите пакет 👇",
+    "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+
     "wait_ticket": "⏳ Пожалуйста подождите, предыдущая заявка ещё рассматривается.",
 
     "register": "📋 Регистрация через TheProp",
@@ -137,7 +166,22 @@ TEXTS = {
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Choose problem type 👇",
 
-    # 🔥 NEW
+    "pricing": "💰 TheProp Prices",
+
+    # 🔥 STEP SYSTEM (QO‘SHILDI)
+    "choose_category": "Choose category 👇",
+    "choose_account": "Choose account 👇",
+    "one_step": "🚀 One Step",
+    "two_step": "🔥 Two Step",
+    "funded": "💎 Funded",
+
+    # 🔥 NEW BACK FOR MENU (QO‘SHILDI)
+    "back_menu": "⬅️ Menu",
+
+    # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
+    "prices_title": "Choose a package 👇",
+    "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+
     "wait_ticket": "⏳ Please wait, your previous request is still being reviewed.",
 
     "register": "📋 Register via TheProp",

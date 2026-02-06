@@ -3,6 +3,13 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
+from keyboards import theprop_category_kb, theprop_accounts_kb
+
+
+
+
+
+
 
 from config import (
     TOKEN,
@@ -42,6 +49,7 @@ def main_kb(lang):
     t = TEXTS[lang]
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text=t["pricing"])], 
             [KeyboardButton(text=t["register"])],
             [KeyboardButton(text=t["trade"])],
             [KeyboardButton(text=t["problems"])],
@@ -64,6 +72,7 @@ def problems_kb(lang):
         resize_keyboard=True
     )
 
+    
 
 # ================= HELPERS =================
 def get_lang(uid):
@@ -81,6 +90,16 @@ def has_open_ticket(uid):
         (uid,)
     ).fetchone()
     return row is not None
+
+
+async def safe_edit(call, text, markup):
+    try:
+        await call.message.edit_text(text, reply_markup=markup)
+    except:
+        pass
+
+
+
 
 
 # ================= AUTO REMINDER (NEW) =================
@@ -140,11 +159,64 @@ async def handle(msg: Message):
 
 
     if text in [
+        t["pricing"],
         t["register"], t["trade"], t["admin"],
         t["lang"], t["problems"], t["back"]
     ]:
         clear_state(uid)
 
+# ================= PRICING MENU =================
+    if text == t["pricing"]:
+        await msg.answer(
+            t["choose_category"],
+            reply_markup=theprop_category_kb(lang)
+    )
+        return
+
+
+# 🔥🔥🔥 ENG TEPADA BO‘LISHI SHART
+# ===== BACK TO MENU =====
+    if text == t["back_menu"]:
+        await msg.answer(
+            t["menu"],
+            reply_markup=main_kb(lang)
+    )
+        return
+
+
+# ================= CATEGORY CLICK =================
+    if text in [t["one_step"], t["two_step"]]:
+        await msg.answer(
+            t["choose_account"],
+            reply_markup=theprop_accounts_kb(lang, t["packages"])
+    )
+        return
+
+
+    if text == t["funded"]:
+        await msg.answer(
+            t["choose_account"],
+            reply_markup=theprop_accounts_kb(lang, t["packages"][1:])
+    )
+        return
+
+
+# ===== BACK TO CATEGORY =====
+    if text == t["back"]:
+        await msg.answer(
+            t["choose_category"],
+            reply_markup=theprop_category_kb(lang)
+    )
+        return
+
+
+# ================= PACKAGE CLICK =================
+    if text in t["packages"]:
+        await msg.answer(
+            f"{text} paket tanlandi ✅\n\nAdmin bilan bog‘laning.",
+            reply_markup=main_kb(lang)
+    )
+        return
 
     # ================= VIDEOS =================
     if text == t["register"]:
