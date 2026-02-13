@@ -1,4 +1,5 @@
 import asyncio
+import re
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
@@ -33,6 +34,37 @@ db = Database()
 # ================= STATES =================
 users_lang = {}
 users_waiting = {}  # uid -> thread
+users_section = {}  # uid -> active submenu
+users_pricing_type = {}  # uid -> one_step | two_step | funded
+
+
+ONE_STEP_OFFERS = {
+    "5K": {"balance": 5000, "fee": 49},
+    "10K": {"balance": 10000, "fee": 99},
+    "25K": {"balance": 25000, "fee": 199},
+    "50K": {"balance": 50000, "fee": 299},
+    "100K": {"balance": 100000, "fee": 499},
+    "200K": {"balance": 200000, "fee": 999},
+}
+
+
+TWO_STEP_OFFERS = {
+    "5K": {"balance": 5000, "fee": 35, "daily_pct": 0.04},
+    "10K": {"balance": 10000, "fee": 65, "daily_pct": 0.04},
+    "25K": {"balance": 25000, "fee": 155, "daily_pct": 0.04},
+    "50K": {"balance": 50000, "fee": 265, "daily_pct": 0.04},
+    "100K": {"balance": 100000, "fee": 455, "daily_pct": 0.05},
+    "200K": {"balance": 200000, "fee": 855, "daily_pct": 0.04},
+}
+
+
+FUNDED_OFFERS = {
+    "10K": {"balance": 10000, "fee": 195},
+    "25K": {"balance": 25000, "fee": 425},
+    "50K": {"balance": 50000, "fee": 825},
+    "100K": {"balance": 100000, "fee": 1525},
+    "200K": {"balance": 200000, "fee": 2995},
+}
 
 
 # ================= KEYBOARDS =================
@@ -81,6 +113,105 @@ def get_lang(uid):
 
 def clear_state(uid):
     users_waiting.pop(uid, None)
+    users_section.pop(uid, None)
+    users_pricing_type.pop(uid, None)
+
+
+def normalize_package(text):
+    return text.replace("💰", "").strip()
+
+
+def usd(amount):
+    return f"${amount:,}"
+
+
+def format_one_step_offer(lang, package_key):
+    offer = ONE_STEP_OFFERS.get(package_key)
+    if not offer:
+        return None
+
+    t = TEXTS[lang]
+    balance = offer["balance"]
+    fee = offer["fee"]
+    phase_amount = int(balance * 0.10)
+    drawdown_amount = int(balance * 0.06)
+    daily_drawdown_amount = int(balance * 0.03)
+
+    return (
+        f"📦 {package_key} {t['challenge_label']}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"💳 {t['fee_label']}: ${fee}\n\n"
+        f"📋 {t['rules_title']}:\n"
+        f"• 📈 {t['phase_label']}: 10% ({usd(phase_amount)})\n"
+        f"• 📉 {t['drawdown_label']}: 6% ({usd(drawdown_amount)})\n"
+        f"• 📉 {t['daily_drawdown_label']}: 3% ({usd(daily_drawdown_amount)})\n"
+        f"• 📅 {t['min_trade_days_label']}: {t['min_trade_days_value']}\n"
+        f"• 💸 {t['first_payout_label']}: {t['first_payout_value']}\n"
+        f"• 🤝 {t['profit_split_label']}: 80%\n\n"
+        f"✅ {t['news_trading_label']}\n"
+        f"✅ {t['weekend_holding_label']}\n\n"
+        f"🛒 {t['purchase_label']}: https://theprop.net"
+    )
+
+
+def format_two_step_offer(lang, package_key):
+    offer = TWO_STEP_OFFERS.get(package_key)
+    if not offer:
+        return None
+
+    t = TEXTS[lang]
+    balance = offer["balance"]
+    fee = offer["fee"]
+    phase1_amount = int(balance * 0.08)
+    phase2_amount = int(balance * 0.05)
+    drawdown_amount = int(balance * 0.10)
+    daily_pct = offer["daily_pct"]
+    daily_drawdown_amount = int(balance * daily_pct)
+    daily_drawdown_pct = int(daily_pct * 100)
+
+    return (
+        f"📦 {package_key} {t['challenge_label']}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"💳 {t['fee_label']}: ${fee}\n\n"
+        f"📋 {t['rules_title']}:\n"
+        f"• 📈 {t['phase_label']}: 8% ({usd(phase1_amount)})\n"
+        f"• 📈 {t['phase2_label']}: 5% ({usd(phase2_amount)})\n"
+        f"• 📉 {t['drawdown_label']}: 10% ({usd(drawdown_amount)})\n"
+        f"• 📉 {t['daily_drawdown_label']}: {daily_drawdown_pct}% ({usd(daily_drawdown_amount)})\n"
+        f"• 📅 {t['min_trade_days_label']}: {t['min_trade_days_value']}\n"
+        f"• 💸 {t['first_payout_label']}: {t['first_payout_value']}\n"
+        f"• 🤝 {t['profit_split_label']}: 80%\n\n"
+        f"✅ {t['news_trading_label']}\n"
+        f"✅ {t['weekend_holding_label']}\n\n"
+        f"🛒 {t['purchase_label']}: https://theprop.net"
+    )
+
+
+def format_funded_offer(lang, package_key):
+    offer = FUNDED_OFFERS.get(package_key)
+    if not offer:
+        return None
+
+    t = TEXTS[lang]
+    balance = offer["balance"]
+    fee = offer["fee"]
+    drawdown_amount = int(balance * 0.05)
+    daily_drawdown_amount = int(balance * 0.03)
+
+    return (
+        f"📦 {package_key} {t['funded_offer_label']}\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"💳 {t['fee_label']}: ${fee}\n\n"
+        f"📋 {t['rules_title']}:\n"
+        f"• 📉 {t['drawdown_label']}: 5% ({usd(drawdown_amount)})\n"
+        f"• 📉 {t['daily_drawdown_label']}: 3% ({usd(daily_drawdown_amount)})\n"
+        f"• 📅 {t['min_trade_days_label']}: {t['min_trade_days_value']}\n"
+        f"• 💸 {t['first_payout_label']}: {t['first_payout_value']}\n"
+        f"• 🤝 {t['profit_split_label']}: 80%\n\n"
+        f"✅ {t['news_trading_label']}\n"
+        f"✅ {t['weekend_holding_label']}\n\n"
+        f"🛒 {t['purchase_label']}: https://theprop.net"
+    )
 
 
 # 🔥 OPEN TICKET CHECK
@@ -97,6 +228,56 @@ async def safe_edit(call, text, markup):
         await call.message.edit_text(text, reply_markup=markup)
     except:
         pass
+
+
+TICKET_ID_PATTERN = re.compile(r"(?:Ticket|Заявка)\s*#\s*(\d+)", re.IGNORECASE)
+
+
+def extract_ticket_id_from_reply_chain(msg: Message):
+    current = msg.reply_to_message
+    depth = 0
+
+    while current and depth < 6:
+        for raw in (current.text, current.caption):
+            if raw:
+                found = TICKET_ID_PATTERN.search(raw)
+                if found:
+                    return int(found.group(1))
+        current = current.reply_to_message
+        depth += 1
+
+    return None
+
+
+async def send_admin_reply_to_user(msg: Message, ticket_id: int, answer_text: str):
+    user_id = db.get_user_by_ticket(ticket_id)
+    if not user_id:
+        await msg.reply("❌ Ticket topilmadi")
+        return
+
+    lang = db.get_lang(user_id)
+
+    reply_prefix = {
+        "uz": "📩 Javob",
+        "ru": "📩 Ответ",
+        "en": "📩 Reply"
+    }[lang]
+
+    admin_label = {
+        "uz": "👨‍💻 Admin",
+        "ru": "👨‍💻 Админ",
+        "en": "👨‍💻 Admin"
+    }[lang]
+
+    await bot.send_message(
+        user_id,
+        f"{reply_prefix} (Ticket #{ticket_id})\n\n{admin_label}:\n{answer_text}"
+    )
+
+    db.add_admin_reply(ticket_id, answer_text)
+    db.close_ticket(ticket_id)
+
+    await msg.reply("✅ Yuborildi va ticket yopildi")
 
 
 
@@ -161,12 +342,13 @@ async def handle(msg: Message):
     if text in [
         t["pricing"],
         t["register"], t["trade"], t["admin"],
-        t["lang"], t["problems"], t["back"]
+        t["lang"], t["problems"]
     ]:
         clear_state(uid)
 
 # ================= PRICING MENU =================
     if text == t["pricing"]:
+        users_section[uid] = "pricing_category"
         await msg.answer(
             t["choose_category"],
             reply_markup=theprop_category_kb(lang)
@@ -177,6 +359,7 @@ async def handle(msg: Message):
 # 🔥🔥🔥 ENG TEPADA BO‘LISHI SHART
 # ===== BACK TO MENU =====
     if text == t["back_menu"]:
+        users_section.pop(uid, None)
         await msg.answer(
             t["menu"],
             reply_markup=main_kb(lang)
@@ -185,7 +368,19 @@ async def handle(msg: Message):
 
 
 # ================= CATEGORY CLICK =================
-    if text in [t["one_step"], t["two_step"]]:
+    if text == t["one_step"]:
+        users_section[uid] = "pricing_accounts"
+        users_pricing_type[uid] = "one_step"
+        await msg.answer(
+            t["choose_account"],
+            reply_markup=theprop_accounts_kb(lang, t["packages"])
+    )
+        return
+
+
+    if text == t["two_step"]:
+        users_section[uid] = "pricing_accounts"
+        users_pricing_type[uid] = "two_step"
         await msg.answer(
             t["choose_account"],
             reply_markup=theprop_accounts_kb(lang, t["packages"])
@@ -194,6 +389,8 @@ async def handle(msg: Message):
 
 
     if text == t["funded"]:
+        users_section[uid] = "pricing_accounts"
+        users_pricing_type[uid] = "funded"
         await msg.answer(
             t["choose_account"],
             reply_markup=theprop_accounts_kb(lang, t["packages"][1:])
@@ -201,21 +398,53 @@ async def handle(msg: Message):
         return
 
 
-# ===== BACK TO CATEGORY =====
+# ===== BACK ROUTING =====
     if text == t["back"]:
-        await msg.answer(
-            t["choose_category"],
-            reply_markup=theprop_category_kb(lang)
-    )
+        section = users_section.get(uid)
+        if section == "pricing_accounts":
+            users_section[uid] = "pricing_category"
+            users_pricing_type.pop(uid, None)
+            await msg.answer(
+                t["choose_category"],
+                reply_markup=theprop_category_kb(lang)
+        )
+            return
+
+        users_section.pop(uid, None)
+        users_pricing_type.pop(uid, None)
+        await msg.answer(t["menu"], reply_markup=main_kb(lang))
         return
 
 
 # ================= PACKAGE CLICK =================
     if text in t["packages"]:
+        package_key = normalize_package(text)
+        pricing_type = users_pricing_type.get(uid)
+        users_section.pop(uid, None)
+        users_pricing_type.pop(uid, None)
+
+        if pricing_type == "one_step":
+            offer_text = format_one_step_offer(lang, package_key)
+            if offer_text:
+                await msg.answer(offer_text, reply_markup=main_kb(lang))
+                return
+
+        if pricing_type == "two_step":
+            offer_text = format_two_step_offer(lang, package_key)
+            if offer_text:
+                await msg.answer(offer_text, reply_markup=main_kb(lang))
+                return
+
+        if pricing_type == "funded":
+            offer_text = format_funded_offer(lang, package_key)
+            if offer_text:
+                await msg.answer(offer_text, reply_markup=main_kb(lang))
+                return
+
         await msg.answer(
-            f"{text} paket tanlandi ✅\n\nAdmin bilan bog‘laning.",
+            t["package_selected"].format(package=package_key),
             reply_markup=main_kb(lang)
-    )
+        )
         return
 
     # ================= VIDEOS =================
@@ -251,13 +480,8 @@ async def handle(msg: Message):
 
     # ================= PROBLEMS MENU =================
     if text == t["problems"]:
+        users_section[uid] = "problems"
         await msg.answer(t["problem_type"], reply_markup=problems_kb(lang))
-        return
-
-
-    # ================= BACK =================
-    if text == t["back"]:
-        await msg.answer(t["menu"], reply_markup=main_kb(lang))
         return
 
 
@@ -268,88 +492,100 @@ async def handle(msg: Message):
         "en": "⏳ Your ticket is being reviewed.\nPlease wait."
     }[lang]
 
-    if has_open_ticket(uid):
-        await msg.answer(wait_text)
-        return
-
-
     # ================= PROBLEM BUTTONS =================
     if text == t["withdraw"]:
+        if has_open_ticket(uid):
+            await msg.answer(wait_text)
+            return
         users_waiting[uid] = WITHDRAW_THREAD
         await msg.answer(t["withdraw_msg"], disable_web_page_preview=True)
         return
 
     if text == t["payment"]:
+        if has_open_ticket(uid):
+            await msg.answer(wait_text)
+            return
         users_waiting[uid] = NO_ACCOUNT_THREAD
         await msg.answer(t["payment_msg"], disable_web_page_preview=True)
         return
 
     if text == t["tech"]:
+        if has_open_ticket(uid):
+            await msg.answer(wait_text)
+            return
         users_waiting[uid] = TECH_THREAD
         await msg.answer(t["tech_msg"], disable_web_page_preview=True)
         return
 
-# ================= FORWARD =================
-    if uid in users_waiting:
+    # ================= FORWARD =================
+    is_media = bool(msg.photo or msg.video or msg.document or msg.audio or msg.voice or msg.sticker)
+    is_content = bool(msg.text or msg.caption or is_media)
+    open_ticket_id = db.get_open_ticket(uid)
 
-        thread = users_waiting.pop(uid)
-    ticket_id = db.create_ticket(uid, thread)
+    if is_content and (uid in users_waiting or open_ticket_id):
+        ticket_id = open_ticket_id
+        thread = db.get_thread_by_ticket(ticket_id) if ticket_id else None
+        created_now = False
 
-    header = (
-        f"🎫 Ticket #{ticket_id}\n"
-        f"👤 {msg.from_user.full_name}\n"
-        f"🆔 {uid}"
-    )
+        if not ticket_id and uid in users_waiting:
+            thread = users_waiting[uid]
+            ticket_id = db.create_ticket(uid, thread)
+            created_now = True
 
-    await bot.send_message(GROUP_ID, header, message_thread_id=thread)
-
-    # ===== MEDIA bo‘lsa (rasm/video/file) =====
-    if msg.photo or msg.video or msg.document or msg.audio or msg.voice or msg.sticker:
-
-        await bot.copy_message(
-            chat_id=GROUP_ID,
-            from_chat_id=msg.chat.id,
-            message_id=msg.message_id,
-            message_thread_id=thread
-        )
-
-        # caption bo‘lsa alohida yuboramiz
-        if msg.caption:
-            await bot.send_message(
-                GROUP_ID,
-                msg.caption,
-                message_thread_id=thread
+            header = (
+                f"🎫 Ticket #{ticket_id}\n"
+                f"👤 {msg.from_user.full_name}\n"
+                f"🆔 {uid}"
             )
+            await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
-    # ===== oddiy text bo‘lsa =====
-    elif msg.text:
-        await bot.send_message(
-            GROUP_ID,
-            msg.text,
-            message_thread_id=thread
-        )
+        users_waiting.pop(uid, None)
 
-    content = msg.text or msg.caption or "[media]"
-    db.add_message(ticket_id, "user", content)
+        if ticket_id and thread:
+            if is_media:
+                await bot.copy_message(
+                    chat_id=GROUP_ID,
+                    from_chat_id=msg.chat.id,
+                    message_id=msg.message_id,
+                    message_thread_id=thread
+                )
+            elif msg.text:
+                await bot.send_message(
+                    GROUP_ID,
+                    msg.text,
+                    message_thread_id=thread
+                )
 
-    confirm_text = {
-        "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
-        "ru": f"✅ Заявка #{ticket_id} принята\n\n",
-        "en": f"✅ Ticket #{ticket_id} received\n\n"
-    }[lang]
+            content = msg.text or msg.caption or "[media]"
+            db.add_message(ticket_id, "user", content)
 
-    if thread == WITHDRAW_THREAD:
-        await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
-    elif thread == NO_ACCOUNT_THREAD:
-        await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
-    else:
-        await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+            if created_now:
+                confirm_text = {
+                    "uz": f"✅ Ticket #{ticket_id} qabul qilindi\n\n",
+                    "ru": f"✅ Заявка #{ticket_id} принята\n\n",
+                    "en": f"✅ Ticket #{ticket_id} received\n\n"
+                }[lang]
+
+                if thread == WITHDRAW_THREAD:
+                    await msg.answer(confirm_text + t["withdraw_done"], reply_markup=main_kb(lang))
+                elif thread == NO_ACCOUNT_THREAD:
+                    await msg.answer(confirm_text + t["payment_done"], reply_markup=main_kb(lang))
+                else:
+                    await msg.answer(confirm_text + t["tech_done"], reply_markup=main_kb(lang))
+
+            return
+
+    if has_open_ticket(uid):
+        await msg.answer(wait_text)
+        return
 
 
 
 # ================= ADMIN REPLY =================
 @dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/reply"))
 async def admin_reply(msg: Message):
+    if msg.chat.id != GROUP_ID:
+        return
 
     try:
         parts = msg.text.split(maxsplit=2)
@@ -359,34 +595,33 @@ async def admin_reply(msg: Message):
         await msg.reply("❌ Format: /reply 1 text")
         return
 
-    user_id = db.get_user_by_ticket(ticket_id)
-    if not user_id:
-        await msg.reply("❌ Ticket topilmadi")
+    await send_admin_reply_to_user(msg, ticket_id, answer)
+
+
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.reply_to_message)
+async def admin_reply_by_reply(msg: Message):
+    if msg.chat.id != GROUP_ID:
         return
 
-    lang = db.get_lang(user_id)
+    if not msg.reply_to_message or not msg.reply_to_message.from_user:
+        return
+    if msg.reply_to_message.from_user.id != bot.id:
+        return
 
-    reply_prefix = {
-        "uz": "📩 Javob",
-        "ru": "📩 Ответ",
-        "en": "📩 Reply"
-    }[lang]
+    if msg.text and msg.text.startswith("/"):
+        return
 
-    admin_label = {
-        "uz": "👨‍💻 Admin",
-        "ru": "👨‍💻 Админ",
-        "en": "👨‍💻 Admin"
-    }[lang]
+    answer = msg.text or msg.caption
+    if not answer:
+        await msg.reply("❌ Javob matni bo‘sh")
+        return
 
-    await bot.send_message(
-        user_id,
-        f"{reply_prefix} (Ticket #{ticket_id})\n\n{admin_label}:\n{answer}"
-    )
+    ticket_id = extract_ticket_id_from_reply_chain(msg)
+    if not ticket_id:
+        await msg.reply("❌ Ticket topilmadi. Ticket xabariga reply qiling")
+        return
 
-    db.add_admin_reply(ticket_id, answer)
-    db.close_ticket(ticket_id)
-
-    await msg.reply("✅ Yuborildi va ticket yopildi")
+    await send_admin_reply_to_user(msg, ticket_id, answer)
 # ================= ADMIN COMMANDS (NEW) =================
 
 # /stats

@@ -12,7 +12,7 @@ TEXTS = {
 # =================================================
 "uz": {
 
-    "menu": "Menu 👇",
+    "menu": "Menyu 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Muammo turini tanlang 👇",
 
@@ -20,18 +20,35 @@ TEXTS = {
     "pricing": "💰 TheProp narxlari",
 
     # 🔥 STEP SYSTEM (QO‘SHILDI)
-    "choose_category": "Kategoriyani tanlang 👇",
-    "choose_account": "Account tanlang 👇",
-    "one_step": "🚀 One Step",
-    "two_step": "🔥 Two Step",
-    "funded": "💎 Funded",
+    "choose_category": "Toifani tanlang 👇",
+    "choose_account": "Hisobni tanlang 👇",
+    "one_step": "🚀 Bir bosqich",
+    "two_step": "🔥 Ikki bosqich",
+    "funded": "💎 Moliyalashtirilgan",
 
     # 🔥 NEW BACK FOR MENU (QO‘SHILDI)
-    "back_menu": "⬅️ Bosh menyuga qaytish",
+    "back_menu": "⬅️ Bosh menyu",
 
     # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
     "prices_title": "Paketni tanlang 👇",
     "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+    "package_selected": "✅ {package} paket tanlandi.\n\nAdmin bilan bog‘laning.",
+    "challenge_label": "sinov hisobi",
+    "funded_offer_label": "moliyalashtirilgan hisob",
+    "fee_label": "To‘lov",
+    "rules_title": "Qoidalar",
+    "phase_label": "1-bosqich maqsadi",
+    "phase2_label": "2-bosqich maqsadi",
+    "drawdown_label": "Umumiy zarar limiti",
+    "daily_drawdown_label": "Kunlik zarar limiti",
+    "min_trade_days_label": "Eng kam savdo kunlari",
+    "first_payout_label": "Birinchi to‘lov",
+    "profit_split_label": "Foyda ulushi",
+    "news_trading_label": "Yangilik paytida savdo",
+    "weekend_holding_label": "Hafta oxirida pozitsiyani ushlash",
+    "min_trade_days_value": "0 kun",
+    "first_payout_value": "4 kun",
+    "purchase_label": "Xarid qilish",
 
     "register": "📋 ThePropdan ro‘yxatdan o‘tish",
     "trade": "📊 TradeLockerga ulash va savdo qilish",
@@ -96,9 +113,9 @@ TEXTS = {
     # 🔥 STEP SYSTEM (QO‘SHILDI)
     "choose_category": "Выберите категорию 👇",
     "choose_account": "Выберите аккаунт 👇",
-    "one_step": "🚀 One Step",
-    "two_step": "🔥 Two Step",
-    "funded": "💎 Funded",
+    "one_step": "🚀 Один этап",
+    "two_step": "🔥 Два этапа",
+    "funded": "💎 Финансируемый",
 
     # 🔥 NEW BACK FOR MENU (QO‘SHILDI)
     "back_menu": "⬅️ В меню",
@@ -106,6 +123,23 @@ TEXTS = {
     # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
     "prices_title": "Выберите пакет 👇",
     "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+    "package_selected": "✅ Выбран пакет {package}.\n\nСвяжитесь с админом.",
+    "challenge_label": "Челлендж",
+    "funded_offer_label": "финансируемый счет",
+    "fee_label": "Стоимость",
+    "rules_title": "Условия",
+    "phase_label": "Цель 1 этапа",
+    "phase2_label": "Цель 2 этапа",
+    "drawdown_label": "Общий лимит просадки",
+    "daily_drawdown_label": "Дневной лимит просадки",
+    "min_trade_days_label": "Мин. торговых дней",
+    "first_payout_label": "Первая выплата",
+    "profit_split_label": "Доля прибыли",
+    "news_trading_label": "Торговля на новостях",
+    "weekend_holding_label": "Удержание на выходные",
+    "min_trade_days_value": "0 дней",
+    "first_payout_value": "4 дня",
+    "purchase_label": "Покупка",
 
     "wait_ticket": "⏳ Пожалуйста подождите, предыдущая заявка ещё рассматривается.",
 
@@ -181,6 +215,22 @@ TEXTS = {
     # 🔥 NEW ✅ (QO‘SHILDI) + 200K FIX
     "prices_title": "Choose a package 👇",
     "packages": ["💰 5K", "💰 10K", "💰 25K", "💰 50K", "💰 100K", "💰 200K"],
+    "package_selected": "✅ {package} package selected.\n\nContact admin.",
+    "challenge_label": "Challenge",
+    "funded_offer_label": "Funded",
+    "rules_title": "Rules",
+    "phase_label": "Phase 1 Target",
+    "phase2_label": "Phase 2 Target",
+    "drawdown_label": "Max Drawdown",
+    "daily_drawdown_label": "Daily Drawdown",
+    "min_trade_days_label": "Min Trading Days",
+    "first_payout_label": "First Payout",
+    "profit_split_label": "Profit Split",
+    "news_trading_label": "News Trading",
+    "weekend_holding_label": "Weekend Holding",
+    "min_trade_days_value": "0 Days",
+    "first_payout_value": "4 Days",
+    "purchase_label": "Purchase",
 
     "wait_ticket": "⏳ Please wait, your previous request is still being reviewed.",
 
