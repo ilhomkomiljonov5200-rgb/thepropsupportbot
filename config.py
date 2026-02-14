@@ -1,3 +1,6 @@
+import os
+
+
 # ================= BOT =================
 # 🔥 LOCAL TEST (VS Code)
 # Tokenni shu yerga yozamiz
@@ -17,3 +20,11 @@ TECH_THREAD = 444
 
 # ================= ADMIN =================
 ADMIN_LINK = "https://t.me/thepropsupportuzb"
+
+
+# ================= AI =================
+OPENAI_API_KEY = os.getenv(
+    "OPENAI_API_KEY",
+    "",
+)
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

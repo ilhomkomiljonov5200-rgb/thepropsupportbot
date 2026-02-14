@@ -1,5 +1,8 @@
 import asyncio
+import json
 import re
+import urllib.error
+import urllib.request
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
@@ -19,7 +22,9 @@ from config import (
     WITHDRAW_THREAD,
     NO_ACCOUNT_THREAD,
     TECH_THREAD,
-    REMINDER_GROUP_ID
+    REMINDER_GROUP_ID,
+    OPENAI_API_KEY,
+    OPENAI_MODEL
 )
 
 from texts import TEXTS, CHOOSE_ALL
@@ -36,6 +41,7 @@ users_lang = {}
 users_waiting = {}  # uid -> thread
 users_section = {}  # uid -> active submenu
 users_pricing_type = {}  # uid -> one_step | two_step | funded
+users_ai_mode = set()
 
 
 ONE_STEP_OFFERS = {
@@ -115,6 +121,7 @@ def clear_state(uid):
     users_waiting.pop(uid, None)
     users_section.pop(uid, None)
     users_pricing_type.pop(uid, None)
+    users_ai_mode.discard(uid)
 
 
 def normalize_package(text):
@@ -123,6 +130,92 @@ def normalize_package(text):
 
 def usd(amount):
     return f"${amount:,}"
+
+
+def ai_system_prompt(lang):
+    prompts = {
+        "uz": "Siz TheProp botidagi AI yordamchisiz. Foydalanuvchiga qisqa, aniq va amaliy javob bering. Javob tili: o‘zbek.",
+        "ru": "Вы AI-помощник бота TheProp. Отвечайте кратко, понятно и по делу. Язык ответа: русский.",
+        "en": "You are the AI assistant of TheProp bot. Reply briefly, clearly, and practically. Response language: English.",
+    }
+    return prompts.get(lang, prompts["en"])
+
+
+def _call_openai_sync(user_text, lang):
+    return _call_openai_sync_with_model(user_text, lang, OPENAI_MODEL)
+
+
+async def ask_ai(user_text, lang):
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY topilmadi")
+
+    tried = []
+    last_error = None
+    models = [OPENAI_MODEL, "gpt-4.1-mini", "gpt-4o-mini"]
+
+    for model in models:
+        if model in tried:
+            continue
+        tried.append(model)
+        try:
+            return await asyncio.to_thread(_call_openai_sync_with_model, user_text, lang, model)
+        except RuntimeError as err:
+            last_error = err
+            continue
+
+    raise RuntimeError(str(last_error) if last_error else "AI javob topilmadi")
+
+
+def _call_openai_sync_with_model(user_text, lang, model):
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": ai_system_prompt(lang)},
+            {"role": "user", "content": user_text},
+        ],
+        "temperature": 0.3,
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urllib.request.urlopen(req, timeout=40) as resp:
+            raw = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as http_err:
+        body = http_err.read().decode("utf-8", errors="replace")
+        reason = f"HTTP {http_err.code}"
+        try:
+            parsed = json.loads(body)
+            message = parsed.get("error", {}).get("message")
+            if message:
+                reason = f"{reason}: {message}"
+        except Exception:
+            pass
+        raise RuntimeError(reason)
+    except urllib.error.URLError as url_err:
+        raise RuntimeError(f"Network xatosi: {url_err.reason}")
+    except TimeoutError:
+        raise RuntimeError("Timeout")
+
+    choices = raw.get("choices") or []
+    if not choices:
+        raise RuntimeError("choices bo'sh")
+
+    message = choices[0].get("message", {})
+    content = message.get("content")
+    if isinstance(content, str) and content.strip():
+        return content.strip()
+
+    raise RuntimeError("content bo'sh")
 
 
 def format_one_step_offer(lang, package_key):
@@ -346,6 +439,11 @@ async def handle(msg: Message):
     ]:
         clear_state(uid)
 
+    # ================= AI HELP (DISABLED) =================
+    if text == t["ai_help"]:
+        await msg.answer(t["ai_disabled"], reply_markup=main_kb(lang))
+        return
+
 # ================= PRICING MENU =================
     if text == t["pricing"]:
         users_section[uid] = "pricing_category"
@@ -483,7 +581,6 @@ async def handle(msg: Message):
         users_section[uid] = "problems"
         await msg.answer(t["problem_type"], reply_markup=problems_kb(lang))
         return
-
 
     # ================= BLOCK IF OPEN =================
     wait_text = {

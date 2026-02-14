@@ -15,6 +15,11 @@ TEXTS = {
     "menu": "Menyu 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Muammo turini tanlang 👇",
+    "ai_help": "🤖 AI yordami",
+    "ai_prompt": "🤖 AI yordamchisi yoqildi.\nSavolingizni yozing.",
+    "ai_error": "❌ AI javob berishda xatolik bo‘ldi. Keyinroq urinib ko‘ring.",
+    "ai_error_reason": "❌ AI xatosi: {reason}",
+    "ai_disabled": "🤖 AI yordami vaqtincha o‘chirildi.",
 
     # 🔥 NEW (pricing qo‘shildi)
     "pricing": "💰 TheProp narxlari",
@@ -107,6 +112,11 @@ TEXTS = {
     "menu": "Меню 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Выберите тип проблемы 👇",
+    "ai_help": "🤖 AI помощь",
+    "ai_prompt": "🤖 AI-помощник включен.\nНапишите свой вопрос.",
+    "ai_error": "❌ Ошибка AI при ответе. Попробуйте позже.",
+    "ai_error_reason": "❌ Ошибка AI: {reason}",
+    "ai_disabled": "🤖 AI-помощь временно отключена.",
 
     "pricing": "💰 Цены TheProp",
 
@@ -199,6 +209,11 @@ TEXTS = {
     "menu": "Menu 👇",
     "choose_lang": CHOOSE_ALL,
     "problem_type": "❓ Choose problem type 👇",
+    "ai_help": "🤖 AI Help",
+    "ai_prompt": "🤖 AI assistant is enabled.\nType your question.",
+    "ai_error": "❌ AI failed to answer. Please try again later.",
+    "ai_error_reason": "❌ AI error: {reason}",
+    "ai_disabled": "🤖 AI help is temporarily disabled.",
 
     "pricing": "💰 TheProp Prices",
 
