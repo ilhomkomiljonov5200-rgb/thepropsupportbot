@@ -20,6 +20,7 @@ def main_menu(lang):
 
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text=t["ai_help"])],
             [KeyboardButton(text=t["pricing"])],
 
             [KeyboardButton(text=t["register"])],

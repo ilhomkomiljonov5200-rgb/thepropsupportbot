@@ -1,4 +1,10 @@
 import os
+from dotenv import load_dotenv
+
+# 1) custom file used in this project
+load_dotenv("stiker.env")
+# 2) optional standard .env support
+load_dotenv()
 
 
 # ================= BOT =================
@@ -26,5 +32,5 @@ ADMIN_LINK = "https://t.me/thepropsupportuzb"
 OPENAI_API_KEY = os.getenv(
     "OPENAI_API_KEY",
     "",
-)
+).strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")

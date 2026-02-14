@@ -1,5 +1,7 @@
 import asyncio
+import base64
 import json
+import mimetypes
 import re
 import urllib.error
 import urllib.request
@@ -8,13 +10,6 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.filters import Command
 from keyboards import theprop_category_kb, theprop_accounts_kb
-
-
-
-
-
-
-
 from config import (
     TOKEN,
     GROUP_ID,
@@ -42,6 +37,10 @@ users_waiting = {}  # uid -> thread
 users_section = {}  # uid -> active submenu
 users_pricing_type = {}  # uid -> one_step | two_step | funded
 users_ai_mode = set()
+users_ai_images = {}  # uid -> [{"file_id": str, "mime_type": str}]
+
+AI_MAX_BUFFER_IMAGES = 30
+AI_MAX_IMAGES_PER_REQUEST = 10
 
 
 ONE_STEP_OFFERS = {
@@ -87,6 +86,7 @@ def main_kb(lang):
     t = TEXTS[lang]
     return ReplyKeyboardMarkup(
         keyboard=[
+            [KeyboardButton(text=t["ai_help"])],
             [KeyboardButton(text=t["pricing"])], 
             [KeyboardButton(text=t["register"])],
             [KeyboardButton(text=t["trade"])],
@@ -122,6 +122,7 @@ def clear_state(uid):
     users_section.pop(uid, None)
     users_pricing_type.pop(uid, None)
     users_ai_mode.discard(uid)
+    users_ai_images.pop(uid, None)
 
 
 def normalize_package(text):
@@ -134,46 +135,162 @@ def usd(amount):
 
 def ai_system_prompt(lang):
     prompts = {
-        "uz": "Siz TheProp botidagi AI yordamchisiz. Foydalanuvchiga qisqa, aniq va amaliy javob bering. Javob tili: o‘zbek.",
-        "ru": "Вы AI-помощник бота TheProp. Отвечайте кратко, понятно и по делу. Язык ответа: русский.",
-        "en": "You are the AI assistant of TheProp bot. Reply briefly, clearly, and practically. Response language: English.",
+        "uz": (
+            "Siz TheProp botidagi AI yordamchisiz. Savollarning asosiy konteksti theprop.net "
+            "platformasi (dashboard, challenge/account bosqichlari, to'lov, payout, qoidalar, login). "
+            "Javobni shu kontekstda, qisqa va aniq bering. Keraksiz umumiy IT maslahatlardan qoching, "
+            "imkon qadar TheProp bo'yicha amaliy qadamlarga o'ting. Agar aniq bo'lmasa, kerakli "
+            "screenshot yoki xato matnini so'rang. Markdown belgilarini (** ## __) ishlatmang. "
+            "Javob tili: o'zbek."
+        ),
+        "ru": (
+            "Вы AI-помощник бота TheProp. Большинство вопросов относится к платформе theprop.net "
+            "(dashboard, этапы challenge/account, оплата, payout, правила, вход). Отвечайте именно в "
+            "этом контексте, кратко и по делу. Избегайте слишком общих IT-советов, давайте практичные "
+            "шаги по TheProp. Если данных мало, попросите нужный скриншот или текст ошибки. "
+            "Не используйте Markdown-символы (** ## __). Язык ответа: русский."
+        ),
+        "en": (
+            "You are the AI assistant for TheProp bot. Most questions are about theprop.net "
+            "(dashboard, challenge/account stages, payment, payout, rules, login). Answer in that "
+            "context, briefly and practically. Avoid generic IT advice when a TheProp-specific action "
+            "is possible. If details are missing, ask for the needed screenshot or exact error text. "
+            "Do not use Markdown symbols (** ## __). Response language: English."
+        ),
     }
     return prompts.get(lang, prompts["en"])
 
 
-def _call_openai_sync(user_text, lang):
-    return _call_openai_sync_with_model(user_text, lang, OPENAI_MODEL)
 
 
-async def ask_ai(user_text, lang):
+def _push_ai_image(uid, image_ref):
+    if not image_ref:
+        return
+
+    refs = users_ai_images.setdefault(uid, [])
+    refs.append(image_ref)
+    if len(refs) > AI_MAX_BUFFER_IMAGES:
+        users_ai_images[uid] = refs[-AI_MAX_BUFFER_IMAGES:]
+
+
+def _chunked(seq, size):
+    for i in range(0, len(seq), size):
+        yield seq[i:i + size]
+
+
+async def _build_ai_image_parts(image_refs):
+    parts = []
+
+    for ref in image_refs:
+        try:
+            file = await bot.get_file(ref["file_id"])
+            stream = await bot.download_file(file.file_path, timeout=30)
+            if not stream:
+                continue
+
+            raw = stream.read()
+            if not raw:
+                continue
+
+            mime_type = ref.get("mime_type") or mimetypes.guess_type(file.file_path)[0] or "image/jpeg"
+            if not mime_type.startswith("image/"):
+                mime_type = "image/jpeg"
+
+            b64 = base64.b64encode(raw).decode("ascii")
+            parts.append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:{mime_type};base64,{b64}",
+                    "detail": "low",
+                },
+            })
+        except Exception:
+            continue
+
+    if image_refs and not parts:
+        raise RuntimeError("Rasmlar yuklab bo'lmadi")
+
+    return parts
+
+
+async def _ask_ai_once(user_text, lang, image_parts=None, max_tokens=220):
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY topilmadi")
 
     tried = []
     last_error = None
-    models = [OPENAI_MODEL, "gpt-4.1-mini", "gpt-4o-mini"]
+    models = [OPENAI_MODEL, "gpt-4o-mini"]
 
     for model in models:
         if model in tried:
             continue
         tried.append(model)
         try:
-            return await asyncio.to_thread(_call_openai_sync_with_model, user_text, lang, model)
+            return await asyncio.to_thread(
+                _call_openai_sync_with_model,
+                user_text,
+                lang,
+                model,
+                image_parts or [],
+                max_tokens,
+            )
         except RuntimeError as err:
             last_error = err
+            reason = str(err)
+            # 4xx odatda model bilan ham hal bo'lmaydi, bekor retry qilmaymiz.
+            if reason.startswith("HTTP 4") and not reason.startswith("HTTP 408"):
+                raise RuntimeError(reason)
             continue
 
     raise RuntimeError(str(last_error) if last_error else "AI javob topilmadi")
 
 
-def _call_openai_sync_with_model(user_text, lang, model):
+async def ask_ai(user_text, lang, image_parts=None):
+    image_parts = image_parts or []
+    user_text = (user_text or "").strip()
+
+    if len(image_parts) <= AI_MAX_IMAGES_PER_REQUEST:
+        return await _ask_ai_once(user_text, lang, image_parts=image_parts, max_tokens=220)
+
+    chunks = list(_chunked(image_parts, AI_MAX_IMAGES_PER_REQUEST))
+    partials = []
+
+    for idx, chunk in enumerate(chunks, start=1):
+        chunk_prompt = (
+            f"User request: {user_text}\n\n"
+            f"You are seeing image batch {idx}/{len(chunks)}."
+            " Analyze only this batch and write short findings relevant to the request."
+        )
+        summary = await _ask_ai_once(chunk_prompt, lang, image_parts=chunk, max_tokens=180)
+        partials.append(f"Batch {idx}: {summary}")
+
+    final_prompt = (
+        f"User request: {user_text}\n\n"
+        "Below are findings from multiple image batches.\n"
+        "Combine them into one clear final answer:\n\n"
+        + "\n\n".join(partials)
+    )
+    return await _ask_ai_once(final_prompt, lang, image_parts=[], max_tokens=260)
+
+
+def _call_openai_sync_with_model(user_text, lang, model, image_parts, max_tokens):
+    user_text = (user_text or "").strip()
+    if not user_text:
+        user_text = "Analyze these images briefly and explain key points."
+
+    if image_parts:
+        user_content = [{"type": "text", "text": user_text}, *image_parts]
+    else:
+        user_content = user_text
+
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": ai_system_prompt(lang)},
-            {"role": "user", "content": user_text},
+            {"role": "user", "content": user_content},
         ],
         "temperature": 0.3,
+        "max_tokens": max_tokens,
     }
 
     data = json.dumps(payload).encode("utf-8")
@@ -188,7 +305,7 @@ def _call_openai_sync_with_model(user_text, lang, model):
     )
 
     try:
-        with urllib.request.urlopen(req, timeout=40) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             raw = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as http_err:
         body = http_err.read().decode("utf-8", errors="replace")
@@ -435,14 +552,24 @@ async def handle(msg: Message):
     if text in [
         t["pricing"],
         t["register"], t["trade"], t["admin"],
-        t["lang"], t["problems"]
+        t["lang"], t["problems"], t["ai_help"]
     ]:
         clear_state(uid)
 
-    # ================= AI HELP (DISABLED) =================
+    # ================= AI HELP =================
     if text == t["ai_help"]:
-        await msg.answer(t["ai_disabled"], reply_markup=main_kb(lang))
+        users_ai_mode.add(uid)
+        await msg.answer(t["ai_prompt"], reply_markup=main_kb(lang))
         return
+
+    # ================= AI MODE =================
+    is_image_document = bool(msg.document and (msg.document.mime_type or "").startswith("image/"))
+    is_ai_image = bool(msg.photo or is_image_document)
+    ai_text = (msg.text or msg.caption or "").strip()
+
+
+        
+
 
 # ================= PRICING MENU =================
     if text == t["pricing"]:
@@ -804,7 +931,7 @@ async def close_ticket_cmd(msg: Message):
 
 # ================= RUN =================
 async def main():
-    asyncio.create_task(reminder_loop())  # 🔥 SHU QO‘SHILDI
+    asyncio.create_task(reminder_loop())  
     await dp.start_polling(bot)
 
 
