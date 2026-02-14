@@ -1,10 +1,14 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# 1) custom file used in this project
-load_dotenv("stiker.env")
-# 2) optional standard .env support
-load_dotenv()
+# Optional local env files for development.
+# In Railway, variables come from platform env and these files may not exist.
+BASE_DIR = Path(__file__).resolve().parent
+for env_name in (".env", "stiker.env", "sticker.env"):
+    env_path = BASE_DIR / env_name
+    if env_path.exists():
+        load_dotenv(env_path, override=False)
 
 
 # ================= BOT =================
