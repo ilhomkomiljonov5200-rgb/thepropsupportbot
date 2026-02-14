@@ -1,14 +1,4 @@
 import os
-from pathlib import Path
-from dotenv import load_dotenv
-
-# Optional local env files for development.
-# In Railway, variables come from platform env and these files may not exist.
-BASE_DIR = Path(__file__).resolve().parent
-for env_name in (".env", "stiker.env", "sticker.env"):
-    env_path = BASE_DIR / env_name
-    if env_path.exists():
-        load_dotenv(env_path, override=False)
 
 
 # ================= BOT =================
@@ -35,6 +25,6 @@ ADMIN_LINK = "https://t.me/thepropsupportuzb"
 # ================= AI =================
 OPENAI_API_KEY = os.getenv(
     "OPENAI_API_KEY",
-    "",
+    "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",
 ).strip()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
