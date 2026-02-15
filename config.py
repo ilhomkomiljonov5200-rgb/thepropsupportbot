@@ -15,8 +15,8 @@ def _load_local_env():
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip().strip('"').strip("'")
-                if key:
-                    os.environ.setdefault(key, value)
+                if key and (key not in os.environ or not os.environ.get(key, "").strip()):
+                    os.environ[key] = value
         break
 
 
@@ -34,9 +34,16 @@ def _env_int(name: str, default: int) -> int:
 
 
 # ================= BOT =================
-TOKEN = (os.getenv("BOT_TOKEN", "") or os.getenv("TOKEN", "")).strip()
+TOKEN = (
+    os.getenv("BOT_TOKEN", "").strip()
+    or os.getenv("TOKEN", "").strip()
+    or os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+)
 if not TOKEN:
-    raise RuntimeError("BOT_TOKEN yoki TOKEN env variable topilmadi")
+    raise RuntimeError(
+        "BOT_TOKEN yoki TOKEN topilmadi "
+        "(Railway ishlatsangiz Variables bo'limida BOT_TOKEN kiriting)"
+    )
 
 
 # ================= GROUP =================

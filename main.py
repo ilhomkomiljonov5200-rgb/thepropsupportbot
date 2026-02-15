@@ -3,11 +3,14 @@ import base64
 import html
 import json
 import mimetypes
+import os
 import random
 import re
 import urllib.error
 import urllib.request
+from contextlib import suppress
 from aiogram import Bot, Dispatcher, F
+from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, MenuButtonWebApp, WebAppInfo, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import Command
@@ -830,6 +833,72 @@ async def setup_mini_app_button(chat_id=None):
         print(f"⚠️ Mini app tugmasini sozlab bo'lmadi: {err}")
 
 
+async def _healthcheck_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
+    try:
+        await reader.read(1024)
+        body = b"ok"
+        writer.write(
+            b"HTTP/1.1 200 OK\r\n"
+            b"Content-Type: text/plain; charset=utf-8\r\n"
+            b"Content-Length: 2\r\n"
+            b"Connection: close\r\n\r\n" + body
+        )
+        await writer.drain()
+    except Exception:
+        pass
+    finally:
+        writer.close()
+        with suppress(Exception):
+            await writer.wait_closed()
+
+
+async def start_health_server():
+    raw_port = (os.getenv("PORT") or "").strip()
+    if not raw_port:
+        return None
+
+    try:
+        port = int(raw_port)
+    except ValueError:
+        print(f"⚠️ PORT noto'g'ri: {raw_port}")
+        return None
+
+    try:
+        server = await asyncio.start_server(_healthcheck_client, "0.0.0.0", port)
+        print(f"✅ Health server ishladi: 0.0.0.0:{port}")
+        return server
+    except Exception as err:
+        print(f"⚠️ Health server ochilmadi: {err}")
+        return None
+
+
+async def run_polling_with_retry():
+    retry_delay = 5
+    while True:
+        try:
+            await dp.start_polling(bot)
+            return
+        except asyncio.CancelledError:
+            raise
+        except TelegramUnauthorizedError as err:
+            print(f"❌ Telegram auth xatosi: {err}. BOT_TOKEN ni tekshiring")
+            await asyncio.sleep(60)
+        except TelegramNetworkError as err:
+            print(
+                f"⚠️ Telegram tarmoq xatosi: {err}. "
+                f"{retry_delay}s dan keyin qayta urinish"
+            )
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 60)
+        except Exception as err:
+            print(
+                f"⚠️ Polling to'xtadi: {err}. "
+                f"{retry_delay}s dan keyin qayta urinish"
+            )
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 60)
+
+
 # ================= START =================
 @dp.message(F.text == "/start")
 async def start(msg: Message):
@@ -1432,9 +1501,19 @@ async def close_ticket_cmd(msg: Message):
 
 # ================= RUN =================
 async def main():
+    health_server = await start_health_server()
     await setup_mini_app_button()
-    asyncio.create_task(reminder_loop())  
-    await dp.start_polling(bot)
+    reminder_task = asyncio.create_task(reminder_loop())
+
+    try:
+        await run_polling_with_retry()
+    finally:
+        reminder_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await reminder_task
+        if health_server:
+            health_server.close()
+            await health_server.wait_closed()
 
 
 if __name__ == "__main__":
