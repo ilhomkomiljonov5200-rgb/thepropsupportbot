@@ -47,6 +47,16 @@ class Database:
         )
         """)
 
+        self.cur.execute("""
+        CREATE TABLE IF NOT EXISTS ai_chat_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            user_text TEXT,
+            assistant_text TEXT,
+            created_at TEXT
+        )
+        """)
+
         self.conn.commit()
 
 
@@ -150,6 +160,36 @@ class Database:
         SELECT * FROM messages WHERE ticket_id=?
         ORDER BY id
         """, (ticket_id,)).fetchall()
+
+
+    # =================================================
+    # AI MEMORY
+    # =================================================
+    def add_ai_chat_memory(self, user_id: int, user_text: str, assistant_text: str):
+        self.cur.execute("""
+        INSERT INTO ai_chat_memory (user_id, user_text, assistant_text, created_at)
+        VALUES (?, ?, ?, ?)
+        """, (user_id, user_text, assistant_text, datetime.now().isoformat()))
+        self.conn.commit()
+
+
+    def get_ai_user_memory(self, user_id: int, limit: int = 6):
+        return self.cur.execute("""
+        SELECT user_text, assistant_text, created_at
+        FROM ai_chat_memory
+        WHERE user_id=?
+        ORDER BY id DESC
+        LIMIT ?
+        """, (user_id, limit)).fetchall()
+
+
+    def get_ai_global_memory(self, limit: int = 8):
+        return self.cur.execute("""
+        SELECT user_text, assistant_text, created_at
+        FROM ai_chat_memory
+        ORDER BY id DESC
+        LIMIT ?
+        """, (limit,)).fetchall()
 
 
     # =================================================

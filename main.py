@@ -1,13 +1,15 @@
 import asyncio
 import base64
+import html
 import json
 import mimetypes
+import random
 import re
 import urllib.error
 import urllib.request
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, MenuButtonWebApp, WebAppInfo, CallbackQuery, ReplyKeyboardRemove
 from aiogram.filters import Command
 from keyboards import theprop_category_kb, theprop_accounts_kb
 from config import (
@@ -38,9 +40,85 @@ users_section = {}  # uid -> active submenu
 users_pricing_type = {}  # uid -> one_step | two_step | funded
 users_ai_mode = set()
 users_ai_images = {}  # uid -> [{"file_id": str, "mime_type": str}]
+users_menu_reset = set()  # uid -> menu button reset sent
+users_ai_rating_pending = set()
+users_ai_connect_wait_msg = {}  # uid -> message_id
+users_ai_answer_wait_msg = {}  # uid -> message_id
+users_ai_rating_prompt_msg = {}  # uid -> message_id
+users_ai_connecting = set()
+users_ai_queue_pos = {}  # uid -> queue position
 
 AI_MAX_BUFFER_IMAGES = 30
 AI_MAX_IMAGES_PER_REQUEST = 10
+AI_END_CHAT_CB = "ai:end_chat"
+AI_RATE_CB_PREFIX = "ai:rate:"
+MINI_APP_URL = "https://theprop.net"
+AI_USER_MEMORY_LIMIT = 6
+AI_GLOBAL_MEMORY_LIMIT = 8
+AI_MIN_DETAIL_WORDS = 2
+
+DASHBOARD_ISSUE_KEYWORDS = (
+    "akkaunt",
+    "account",
+    "login",
+    "log in",
+    "dashboard",
+    "dashboar",
+    "dashbord",
+    "dashboarnf",
+    "kirmayap",
+    "kirolm",
+    "qotib",
+    "muzlab",
+    "ishlamayap",
+    "не работает",
+    "не могу войти",
+    "войти",
+    "завис",
+    "freez",
+    "frozen",
+    "stuck",
+)
+
+DASHBOARD_DETAIL_KEYWORDS = (
+    "parol",
+    "password",
+    "kod",
+    "code",
+    "otp",
+    "2fa",
+    "sms",
+    "email",
+    "pochta",
+    "pocht",
+    "xato",
+    "error",
+    "invalid",
+    "captcha",
+    "yozsam",
+    "kirganda",
+    "loginga",
+    "парол",
+    "код",
+    "ошиб",
+    "неверн",
+    "почт",
+    "смс",
+)
+
+GENERIC_DASHBOARD_PHRASES = (
+    "akkauntga kirmayapti",
+    "akkauntga kira olmayapman",
+    "accountga kirmayapti",
+    "dashboard ishlamayapti",
+    "dashboard qotib qolgan",
+    "login ishlamayapti",
+    "не могу войти",
+    "dashboard не работает",
+    "can't login",
+    "cannot login",
+)
+LINK_PATTERN = re.compile(r"(https?://|www\.|t\.me/|telegram\.me/|tg://|@[A-Za-z0-9_]{5,})", re.IGNORECASE)
 
 
 ONE_STEP_OFFERS = {
@@ -123,6 +201,55 @@ def clear_state(uid):
     users_pricing_type.pop(uid, None)
     users_ai_mode.discard(uid)
     users_ai_images.pop(uid, None)
+    users_ai_rating_pending.discard(uid)
+    users_ai_connect_wait_msg.pop(uid, None)
+    users_ai_answer_wait_msg.pop(uid, None)
+    users_ai_rating_prompt_msg.pop(uid, None)
+    users_ai_connecting.discard(uid)
+    users_ai_queue_pos.pop(uid, None)
+
+
+async def safe_delete_message(chat_id, message_id):
+    if not message_id:
+        return
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=message_id)
+    except Exception:
+        pass
+
+
+def message_contains_link(msg: Message):
+    for ent in (msg.entities or []):
+        if ent.type in {"url", "text_link", "mention"}:
+            return True
+    for ent in (msg.caption_entities or []):
+        if ent.type in {"url", "text_link", "mention"}:
+            return True
+
+    # Channel/group forwardlarni ham reklama sifatida ushlaymiz.
+    forwarded_chat = getattr(msg, "forward_from_chat", None)
+    if forwarded_chat and getattr(forwarded_chat, "type", None) in {"group", "supergroup", "channel"}:
+        return True
+
+    text_blob = f"{msg.text or ''}\n{msg.caption or ''}"
+    return bool(LINK_PATTERN.search(text_blob))
+
+
+async def is_admin_in_chat(chat_id: int, user_id: int):
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return member.status in {"administrator", "creator"}
+    except Exception:
+        return False
+
+
+async def replace_queue_message(chat_id, uid, text):
+    old_message_id = users_ai_connect_wait_msg.get(uid)
+    if old_message_id:
+        await safe_delete_message(chat_id, old_message_id)
+
+    sent = await bot.send_message(chat_id, text, reply_markup=ReplyKeyboardRemove())
+    users_ai_connect_wait_msg[uid] = sent.message_id
 
 
 def normalize_package(text):
@@ -133,32 +260,160 @@ def usd(amount):
     return f"${amount:,}"
 
 
+def _short_memory_text(value, limit=180):
+    text = re.sub(r"\s+", " ", (value or "").strip())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1] + "…"
+
+
+def build_ai_memory_context(user_id: int):
+    user_rows = db.get_ai_user_memory(user_id, limit=AI_USER_MEMORY_LIMIT)
+    global_rows = db.get_ai_global_memory(limit=AI_GLOBAL_MEMORY_LIMIT)
+
+    parts = []
+
+    if user_rows:
+        rows = list(reversed(user_rows))
+        lines = []
+        for row in rows:
+            q = _short_memory_text(row["user_text"], 130)
+            a = _short_memory_text(row["assistant_text"], 130)
+            lines.append(f"- User: {q} | Support: {a}")
+        parts.append("Memory from this user's previous chats:\n" + "\n".join(lines))
+
+    if global_rows:
+        rows = list(reversed(global_rows))
+        lines = []
+        for row in rows:
+            q = _short_memory_text(row["user_text"], 100)
+            a = _short_memory_text(row["assistant_text"], 100)
+            lines.append(f"- Q: {q} | A: {a}")
+        parts.append(
+            "General support experience from previous chats (use only as hint, verify with current user details):\n"
+            + "\n".join(lines)
+        )
+
+    return "\n\n".join(parts).strip()
+
+
+def looks_like_vague_dashboard_issue(user_text: str):
+    text = (user_text or "").strip().lower()
+    if not text:
+        return False
+
+    has_issue_keyword = any(keyword in text for keyword in DASHBOARD_ISSUE_KEYWORDS)
+    if not has_issue_keyword:
+        return False
+
+    # Agar foydalanuvchi muammo tafsilotlarini bergan bo'lsa, AI oddiy javob berishi kerak.
+    has_detail = any(keyword in text for keyword in DASHBOARD_DETAIL_KEYWORDS)
+    if has_detail:
+        return False
+
+    words = [w for w in re.split(r"\s+", text) if w]
+    if any(phrase in text for phrase in GENERIC_DASHBOARD_PHRASES) and len(words) <= 2:
+        return True
+
+    if len(words) <= AI_MIN_DETAIL_WORDS:
+        return True
+
+    # Juda qisqa umumiy gap bo'lsa, aniqlik so'raymiz.
+    if len(text) < 18:
+        return True
+
+    return False
+
+
 def ai_system_prompt(lang):
     prompts = {
         "uz": (
-            "Siz TheProp botidagi AI yordamchisiz. Savollarning asosiy konteksti theprop.net "
+            "Siz TheProp Live Chat operatorisiz. Savollarning asosiy konteksti theprop.net "
             "platformasi (dashboard, challenge/account bosqichlari, to'lov, payout, qoidalar, login). "
             "Javobni shu kontekstda, qisqa va aniq bering. Keraksiz umumiy IT maslahatlardan qoching, "
             "imkon qadar TheProp bo'yicha amaliy qadamlarga o'ting. Agar aniq bo'lmasa, kerakli "
-            "screenshot yoki xato matnini so'rang. Markdown belgilarini (** ## __) ishlatmang. "
+            "screenshot yoki xato matnini so'rang. Javobni inson support operatoridek yozing. "
+            "Bitta javobda faqat 1 ta emoji ishlating. Markdown belgilarini (** ## __) ishlatmang. "
+            "Javobda vergul nuqta undov ishlatmang. "
+            "Agar foydalanuvchi login/dashboard ishlamayapti deb juda qisqa yozsa, avval muammoni aniqroq so'rang. "
+            "Agar memory context berilsa, undan faqat yordamchi kontekst sifatida foydalaning. "
+            "Foydalanuvchiga AI ekaningizni aytmang. "
             "Javob tili: o'zbek."
         ),
         "ru": (
-            "Вы AI-помощник бота TheProp. Большинство вопросов относится к платформе theprop.net "
+            "Вы оператор Live Chat TheProp. Большинство вопросов относится к платформе theprop.net "
             "(dashboard, этапы challenge/account, оплата, payout, правила, вход). Отвечайте именно в "
             "этом контексте, кратко и по делу. Избегайте слишком общих IT-советов, давайте практичные "
             "шаги по TheProp. Если данных мало, попросите нужный скриншот или текст ошибки. "
-            "Не используйте Markdown-символы (** ## __). Язык ответа: русский."
+            "Пишите как человек из поддержки. В одном ответе используйте только 1 эмодзи. "
+            "В ответе не используйте запятую точку и восклицательный знак. "
+            "Если пользователь слишком коротко пишет, что login/dashboard не работает, сначала попросите подробности. "
+            "Если дан memory context, используйте его только как подсказку. "
+            "Не используйте Markdown-символы (** ## __). Не говорите пользователю, что вы AI. "
+            "Язык ответа: русский."
         ),
         "en": (
-            "You are the AI assistant for TheProp bot. Most questions are about theprop.net "
+            "You are a Live Chat support operator for TheProp. Most questions are about theprop.net "
             "(dashboard, challenge/account stages, payment, payout, rules, login). Answer in that "
             "context, briefly and practically. Avoid generic IT advice when a TheProp-specific action "
             "is possible. If details are missing, ask for the needed screenshot or exact error text. "
-            "Do not use Markdown symbols (** ## __). Response language: English."
+            "Write like a human support agent. Use exactly 1 emoji per reply. "
+            "Do not use comma period or exclamation mark in replies. "
+            "If user says login/dashboard is broken in very short form, first ask for clearer details. "
+            "If memory context is provided, use it only as a helpful hint. "
+            "Do not use Markdown symbols (** ## __). Never mention being AI. "
+            "Response language: English."
         ),
     }
     return prompts.get(lang, prompts["en"])
+
+
+def prettify_ai_answer(answer: str):
+    text = (answer or "").strip()
+    if not text:
+        return text
+
+    text = text.replace("**", "").replace("__", "")
+    # Telegram markdown heading artifacts
+    text = text.replace("##", "")
+    raw_lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if not raw_lines:
+        return text
+
+    plain_text = "\n".join(raw_lines)
+    plain_text = re.sub(
+        r"[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F1E6-\U0001F1FF\u200d\ufe0f]",
+        "",
+        plain_text,
+    )
+    plain_text = plain_text.replace(",", "").replace(".", "").replace("!", "")
+    plain_text = re.sub(r"[ \t]{2,}", " ", plain_text).strip()
+    if not plain_text:
+        return "🙂"
+    return f"{plain_text} 🙂"
+
+
+def ai_end_chat_kb(lang):
+    t = TEXTS[lang]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=t["ai_end_chat_btn"], callback_data=AI_END_CHAT_CB)]
+        ]
+    )
+
+
+def ai_rating_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text="1. ⭐", callback_data=f"{AI_RATE_CB_PREFIX}1"),
+                InlineKeyboardButton(text="2. ⭐", callback_data=f"{AI_RATE_CB_PREFIX}2"),
+                InlineKeyboardButton(text="3. ⭐", callback_data=f"{AI_RATE_CB_PREFIX}3"),
+                InlineKeyboardButton(text="4. ⭐", callback_data=f"{AI_RATE_CB_PREFIX}4"),
+                InlineKeyboardButton(text="5. ⭐", callback_data=f"{AI_RATE_CB_PREFIX}5"),
+            ]
+        ]
+    )
 
 
 
@@ -213,7 +468,7 @@ async def _build_ai_image_parts(image_refs):
     return parts
 
 
-async def _ask_ai_once(user_text, lang, image_parts=None, max_tokens=220):
+async def _ask_ai_once(user_text, lang, image_parts=None, max_tokens=220, memory_context=""):
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY topilmadi")
 
@@ -233,6 +488,7 @@ async def _ask_ai_once(user_text, lang, image_parts=None, max_tokens=220):
                 model,
                 image_parts or [],
                 max_tokens,
+                memory_context,
             )
         except RuntimeError as err:
             last_error = err
@@ -245,12 +501,18 @@ async def _ask_ai_once(user_text, lang, image_parts=None, max_tokens=220):
     raise RuntimeError(str(last_error) if last_error else "AI javob topilmadi")
 
 
-async def ask_ai(user_text, lang, image_parts=None):
+async def ask_ai(user_text, lang, image_parts=None, memory_context=""):
     image_parts = image_parts or []
     user_text = (user_text or "").strip()
 
     if len(image_parts) <= AI_MAX_IMAGES_PER_REQUEST:
-        return await _ask_ai_once(user_text, lang, image_parts=image_parts, max_tokens=220)
+        return await _ask_ai_once(
+            user_text,
+            lang,
+            image_parts=image_parts,
+            max_tokens=220,
+            memory_context=memory_context,
+        )
 
     chunks = list(_chunked(image_parts, AI_MAX_IMAGES_PER_REQUEST))
     partials = []
@@ -261,7 +523,13 @@ async def ask_ai(user_text, lang, image_parts=None):
             f"You are seeing image batch {idx}/{len(chunks)}."
             " Analyze only this batch and write short findings relevant to the request."
         )
-        summary = await _ask_ai_once(chunk_prompt, lang, image_parts=chunk, max_tokens=180)
+        summary = await _ask_ai_once(
+            chunk_prompt,
+            lang,
+            image_parts=chunk,
+            max_tokens=180,
+            memory_context=memory_context,
+        )
         partials.append(f"Batch {idx}: {summary}")
 
     final_prompt = (
@@ -270,10 +538,16 @@ async def ask_ai(user_text, lang, image_parts=None):
         "Combine them into one clear final answer:\n\n"
         + "\n\n".join(partials)
     )
-    return await _ask_ai_once(final_prompt, lang, image_parts=[], max_tokens=260)
+    return await _ask_ai_once(
+        final_prompt,
+        lang,
+        image_parts=[],
+        max_tokens=260,
+        memory_context=memory_context,
+    )
 
 
-def _call_openai_sync_with_model(user_text, lang, model, image_parts, max_tokens):
+def _call_openai_sync_with_model(user_text, lang, model, image_parts, max_tokens, memory_context):
     user_text = (user_text or "").strip()
     if not user_text:
         user_text = "Analyze these images briefly and explain key points."
@@ -283,12 +557,14 @@ def _call_openai_sync_with_model(user_text, lang, model, image_parts, max_tokens
     else:
         user_content = user_text
 
+    messages = [{"role": "system", "content": ai_system_prompt(lang)}]
+    if memory_context:
+        messages.append({"role": "system", "content": memory_context})
+    messages.append({"role": "user", "content": user_content})
+
     payload = {
         "model": model,
-        "messages": [
-            {"role": "system", "content": ai_system_prompt(lang)},
-            {"role": "user", "content": user_content},
-        ],
+        "messages": messages,
         "temperature": 0.3,
         "max_tokens": max_tokens,
     }
@@ -459,6 +735,33 @@ def extract_ticket_id_from_reply_chain(msg: Message):
     return None
 
 
+def build_ticket_header_and_kb(msg: Message, ticket_id: int):
+    uid = msg.from_user.id
+    full_name = msg.from_user.full_name or "Unknown user"
+    mention_name = html.escape(full_name)
+    username = f"@{msg.from_user.username}" if msg.from_user.username else "yo'q"
+    profile_url = (
+        f"https://t.me/{msg.from_user.username}"
+        if msg.from_user.username
+        else f"tg://user?id={uid}"
+    )
+
+    header = (
+        f"🎫 Ticket #{ticket_id}\n"
+        f"👤 <a href=\"tg://user?id={uid}\">{mention_name}</a>\n"
+        f"🔎 Username: {username}\n"
+        f"🆔 ID: {uid}\n"
+        f"💬 Tez javob: /reply {ticket_id} text"
+    )
+
+    kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="👤 Profilni ochish", url=profile_url)]
+        ]
+    )
+    return header, kb
+
+
 async def send_admin_reply_to_user(msg: Message, ticket_id: int, answer_text: str):
     user_id = db.get_user_by_ticket(ticket_id)
     if not user_id:
@@ -496,10 +799,10 @@ async def send_admin_reply_to_user(msg: Message, ticket_id: int, answer_text: st
 # ================= AUTO REMINDER (NEW) =================
 async def reminder_loop():
     text = (
-        "📢 Eslatma!\n\n"
-        "❗ Muammo bormi?\n"
-        "👉 @thepropsupportbot ga murojaat qiling\n\n"
-        "Support 24/7 ishlaydi ✅"
+        "📢 Eslatma\n\n"
+        "❗ Qanday muammoyingiz bo'lsa\n"
+        "💬 @thepropsupportbot ga murojaat qiling\n\n"
+        "✅ Support xizmati 24/7 ishlaydi"
     )
 
     while True:
@@ -508,13 +811,28 @@ async def reminder_loop():
         except:
             pass
 
-        await asyncio.sleep(3600)  # 1 soat
+        await asyncio.sleep(7200)  # 2 soat
+
+
+async def setup_mini_app_button(chat_id=None):
+    try:
+        await bot.set_chat_menu_button(
+            chat_id=chat_id,
+            menu_button=MenuButtonWebApp(
+                text="TheProp",
+                web_app=WebAppInfo(url=MINI_APP_URL),
+            )
+        )
+    except Exception as err:
+        print(f"⚠️ Mini app tugmasini sozlab bo'lmadi: {err}")
 
 
 # ================= START =================
 @dp.message(F.text == "/start")
 async def start(msg: Message):
     clear_state(msg.from_user.id)
+    await setup_mini_app_button(msg.chat.id)
+    users_menu_reset.add(msg.from_user.id)
 
     db.add_user(
         user_id=msg.from_user.id,
@@ -522,6 +840,81 @@ async def start(msg: Message):
     )
 
     await msg.answer(CHOOSE_ALL, reply_markup=lang_kb())
+
+
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.chat.id == REMINDER_GROUP_ID)
+async def guard_links_in_reminder_group(msg: Message):
+    # Join/leave service xabarlarini tozalaymiz.
+    if msg.new_chat_members or msg.left_chat_member:
+        try:
+            await msg.delete()
+        except Exception:
+            pass
+        return
+
+    if not message_contains_link(msg):
+        return
+
+    # Anonymous admin / channel postlarni o'chirmaymiz.
+    if not msg.from_user:
+        return
+
+    if await is_admin_in_chat(msg.chat.id, msg.from_user.id):
+        return
+
+    try:
+        await msg.delete()
+    except Exception:
+        pass
+
+
+@dp.callback_query(F.data == AI_END_CHAT_CB)
+async def ai_end_chat(call: CallbackQuery):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    t = TEXTS[lang]
+
+    users_ai_mode.discard(uid)
+    users_ai_images.pop(uid, None)
+    users_ai_rating_pending.add(uid)
+
+    if call.message:
+        try:
+            await call.message.edit_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        old_rate_prompt_id = users_ai_rating_prompt_msg.pop(uid, None)
+        await safe_delete_message(call.message.chat.id, old_rate_prompt_id)
+        rating_msg = await bot.send_message(
+            call.message.chat.id,
+            t["ai_rate_prompt"],
+            reply_markup=ai_rating_kb(),
+        )
+        users_ai_rating_prompt_msg[uid] = rating_msg.message_id
+
+    await call.answer()
+
+
+@dp.callback_query(F.data.startswith(AI_RATE_CB_PREFIX))
+async def ai_rate_chat(call: CallbackQuery):
+    uid = call.from_user.id
+    lang = get_lang(uid)
+    t = TEXTS[lang]
+
+    if uid not in users_ai_rating_pending:
+        await call.answer(t["ai_rate_inactive"], show_alert=True)
+        return
+
+    users_ai_rating_pending.discard(uid)
+    users_ai_mode.discard(uid)
+    users_ai_images.pop(uid, None)
+
+    if call.message:
+        rate_prompt_id = users_ai_rating_prompt_msg.pop(uid, None) or call.message.message_id
+        await safe_delete_message(call.message.chat.id, rate_prompt_id)
+        await bot.send_message(call.message.chat.id, t["ai_rate_thanks"], reply_markup=main_kb(lang))
+
+    await call.answer()
 
 
 # ================= MAIN HANDLER =================
@@ -532,6 +925,10 @@ async def handle(msg: Message):
     text = msg.text
     lang = get_lang(uid)
     t = TEXTS[lang]
+
+    if uid not in users_menu_reset:
+        await setup_mini_app_button(msg.chat.id)
+        users_menu_reset.add(uid)
 
     # ================= LANGUAGE =================
     if text in ["🇺🇿 O‘zbek", "🇷🇺 Русский", "🇬🇧 English"]:
@@ -548,6 +945,18 @@ async def handle(msg: Message):
         await msg.answer(TEXTS[lang]["menu"], reply_markup=main_kb(lang))
         return
 
+    if uid in users_ai_connecting and text != t["ai_help"]:
+        position = users_ai_queue_pos.get(uid)
+        if position:
+            await replace_queue_message(
+                msg.chat.id,
+                uid,
+                t["ai_queue_wait"].format(position=position),
+            )
+        else:
+            await replace_queue_message(msg.chat.id, uid, t["ai_wait"])
+        return
+
 
     if text in [
         t["pricing"],
@@ -558,8 +967,37 @@ async def handle(msg: Message):
 
     # ================= AI HELP =================
     if text == t["ai_help"]:
+        users_ai_mode.discard(uid)
+        users_ai_rating_pending.discard(uid)
+        users_ai_connecting.add(uid)
+
+        position = random.randint(5, 15)
+        users_ai_queue_pos[uid] = position
+
+        await replace_queue_message(
+            msg.chat.id,
+            uid,
+            t["ai_queue_wait"].format(position=position),
+        )
+
+        while uid in users_ai_connecting and position > 1:
+            await asyncio.sleep(random.randint(5, 15))
+            if uid not in users_ai_connecting:
+                return
+
+            position = max(1, position - 1)
+            users_ai_queue_pos[uid] = position
+            queue_text = t["ai_queue_wait"].format(position=position)
+            await replace_queue_message(msg.chat.id, uid, queue_text)
+
+        if uid not in users_ai_connecting:
+            return
+
+        users_ai_connecting.discard(uid)
+        users_ai_queue_pos.pop(uid, None)
         users_ai_mode.add(uid)
-        await msg.answer(t["ai_prompt"], reply_markup=main_kb(lang))
+        await safe_delete_message(msg.chat.id, users_ai_connect_wait_msg.pop(uid, None))
+        await msg.answer(t["ai_prompt"], reply_markup=ReplyKeyboardRemove())
         return
 
     # ================= AI MODE =================
@@ -567,8 +1005,66 @@ async def handle(msg: Message):
     is_ai_image = bool(msg.photo or is_image_document)
     ai_text = (msg.text or msg.caption or "").strip()
 
+    if uid in users_ai_mode:
+        if is_ai_image:
+            if msg.photo:
+                _push_ai_image(uid, {"file_id": msg.photo[-1].file_id, "mime_type": "image/jpeg"})
+            elif is_image_document:
+                _push_ai_image(
+                    uid,
+                    {"file_id": msg.document.file_id, "mime_type": msg.document.mime_type or "image/jpeg"},
+                )
 
-        
+            if not ai_text:
+                await msg.answer(
+                    t["ai_images_buffered"].format(count=len(users_ai_images.get(uid, []))),
+                    reply_markup=ReplyKeyboardRemove(),
+                )
+                return
+
+        if ai_text:
+            image_refs = users_ai_images.pop(uid, [])
+            try:
+                if not image_refs and looks_like_vague_dashboard_issue(ai_text):
+                    detail_reply = t["ai_need_details"]
+                    db.add_ai_chat_memory(uid, ai_text, detail_reply)
+                    await msg.answer(
+                        t["ai_reply_pretty"].format(answer=detail_reply),
+                        reply_markup=ai_end_chat_kb(lang),
+                        disable_web_page_preview=True,
+                    )
+                    return
+
+                wait_msg = await msg.answer(t["ai_answer_wait"], reply_markup=ReplyKeyboardRemove())
+                users_ai_answer_wait_msg[uid] = wait_msg.message_id
+                await asyncio.sleep(5)
+                image_parts = await _build_ai_image_parts(image_refs) if image_refs else []
+                memory_context = build_ai_memory_context(uid)
+                answer = await ask_ai(
+                    ai_text,
+                    lang,
+                    image_parts=image_parts,
+                    memory_context=memory_context,
+                )
+                pretty_answer = prettify_ai_answer(answer)
+                await safe_delete_message(msg.chat.id, users_ai_answer_wait_msg.pop(uid, None))
+                db.add_ai_chat_memory(uid, ai_text, pretty_answer)
+                await msg.answer(
+                    t["ai_reply_pretty"].format(answer=pretty_answer),
+                    reply_markup=ai_end_chat_kb(lang),
+                    disable_web_page_preview=True,
+                )
+            except Exception as err:
+                await safe_delete_message(msg.chat.id, users_ai_answer_wait_msg.pop(uid, None))
+                reason = str(err).strip()
+                if reason:
+                    await msg.answer(t["ai_error_reason"].format(reason=reason), reply_markup=ReplyKeyboardRemove())
+                else:
+                    await msg.answer(t["ai_error"], reply_markup=ReplyKeyboardRemove())
+            return
+
+        await msg.answer(t["ai_prompt"], reply_markup=ReplyKeyboardRemove())
+        return
 
 
 # ================= PRICING MENU =================
@@ -756,12 +1252,14 @@ async def handle(msg: Message):
             ticket_id = db.create_ticket(uid, thread)
             created_now = True
 
-            header = (
-                f"🎫 Ticket #{ticket_id}\n"
-                f"👤 {msg.from_user.full_name}\n"
-                f"🆔 {uid}"
+            header, header_kb = build_ticket_header_and_kb(msg, ticket_id)
+            await bot.send_message(
+                GROUP_ID,
+                header,
+                message_thread_id=thread,
+                reply_markup=header_kb,
+                parse_mode="HTML",
             )
-            await bot.send_message(GROUP_ID, header, message_thread_id=thread)
 
         users_waiting.pop(uid, None)
 
@@ -931,6 +1429,7 @@ async def close_ticket_cmd(msg: Message):
 
 # ================= RUN =================
 async def main():
+    await setup_mini_app_button()
     asyncio.create_task(reminder_loop())  
     await dp.start_polling(bot)
 

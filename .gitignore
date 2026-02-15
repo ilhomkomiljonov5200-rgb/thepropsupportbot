@@ -2,3 +2,6 @@
 .env.*
 stiker.env
 sticker.env
+__pycache__/
+.pycache/
+*.pyc
