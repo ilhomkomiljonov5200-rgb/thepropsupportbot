@@ -4,7 +4,6 @@ import html
 import json
 import mimetypes
 import os
-import random
 import re
 import urllib.error
 import urllib.request
@@ -12,8 +11,18 @@ from contextlib import suppress
 from aiogram import Bot, Dispatcher, F
 from aiogram.exceptions import TelegramNetworkError, TelegramUnauthorizedError
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, MenuButtonWebApp, WebAppInfo, CallbackQuery, ReplyKeyboardRemove
-from aiogram.filters import Command
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeAllPrivateChats,
+    BotCommandScopeChat,
+    CallbackQuery,
+    KeyboardButton,
+    MenuButtonWebApp,
+    Message,
+    ReplyKeyboardMarkup,
+    ReplyKeyboardRemove,
+    WebAppInfo,
+)
 from keyboards import theprop_category_kb, theprop_accounts_kb
 from config import (
     TOKEN,
@@ -49,7 +58,6 @@ users_ai_connect_wait_msg = {}  # uid -> message_id
 users_ai_answer_wait_msg = {}  # uid -> message_id
 users_ai_rating_prompt_msg = {}  # uid -> message_id
 users_ai_connecting = set()
-users_ai_queue_pos = {}  # uid -> queue position
 
 AI_MAX_BUFFER_IMAGES = 30
 AI_MAX_IMAGES_PER_REQUEST = 10
@@ -209,7 +217,6 @@ def clear_state(uid):
     users_ai_answer_wait_msg.pop(uid, None)
     users_ai_rating_prompt_msg.pop(uid, None)
     users_ai_connecting.discard(uid)
-    users_ai_queue_pos.pop(uid, None)
 
 
 async def safe_delete_message(chat_id, message_id):
@@ -244,6 +251,76 @@ async def is_admin_in_chat(chat_id: int, user_id: int):
         return member.status in {"administrator", "creator"}
     except Exception:
         return False
+
+
+def parse_ticket_id_from_command(text: str):
+    if not text:
+        return None
+
+    parts = text.strip().split(maxsplit=1)
+    if len(parts) < 2:
+        return None
+
+    raw = parts[1].strip()
+    if not raw:
+        return None
+
+    token = raw.split()[0].lstrip("#")
+    try:
+        ticket_id = int(token)
+    except ValueError:
+        return None
+
+    return ticket_id if ticket_id > 0 else None
+
+
+async def ensure_admin_group_command(msg: Message, notify_denied: bool = True):
+    if msg.chat.id != GROUP_ID:
+        if notify_denied:
+            await msg.reply("❌ Bu komanda faqat support guruhida ishlaydi")
+        return False
+
+    # Anonymous admin (send as group) holatini ruxsat beramiz.
+    if msg.sender_chat and msg.sender_chat.id == msg.chat.id:
+        return True
+
+    if not msg.from_user:
+        if notify_denied:
+            await msg.reply("❌ Admin profilingizdan yuboring")
+        return False
+
+    is_admin = await is_admin_in_chat(msg.chat.id, msg.from_user.id)
+    if is_admin:
+        return True
+
+    if notify_denied:
+        await msg.reply("❌ Bu komanda faqat adminlar uchun")
+    return False
+
+
+async def setup_group_commands():
+    try:
+        await bot.set_my_commands(
+            [
+                BotCommand(command="reply", description="Ticketga javob berish"),
+                BotCommand(command="ochiq", description="Javob qaytarilmagan ticketlar"),
+                BotCommand(command="yopilgan", description="Yopilgan ticketlar ro'yxati"),
+                BotCommand(command="open", description="Yopilgan ticketni qayta ochish"),
+                BotCommand(command="close", description="Ochiq ticketni yopish"),
+                BotCommand(command="stats", description="Support statistikasi"),
+            ],
+            scope=BotCommandScopeChat(chat_id=GROUP_ID),
+        )
+    except Exception as err:
+        print(f"⚠️ Group commandlarni sozlab bo'lmadi: {err}")
+
+    try:
+        await bot.set_my_commands(
+            [BotCommand(command="start", description="Botni ishga tushirish")],
+            scope=BotCommandScopeAllPrivateChats(),
+        )
+    except Exception as err:
+        print(f"⚠️ Private commandlarni sozlab bo'lmadi: {err}")
 
 
 async def replace_queue_message(chat_id, uid, text):
@@ -1018,15 +1095,7 @@ async def handle(msg: Message):
         return
 
     if uid in users_ai_connecting and text != t["ai_help"]:
-        position = users_ai_queue_pos.get(uid)
-        if position:
-            await replace_queue_message(
-                msg.chat.id,
-                uid,
-                t["ai_queue_wait"].format(position=position),
-            )
-        else:
-            await replace_queue_message(msg.chat.id, uid, t["ai_wait"])
+        await replace_queue_message(msg.chat.id, uid, t["ai_wait"])
         return
 
 
@@ -1043,30 +1112,13 @@ async def handle(msg: Message):
         users_ai_rating_pending.discard(uid)
         users_ai_connecting.add(uid)
 
-        position = random.randint(5, 15)
-        users_ai_queue_pos[uid] = position
-
-        await replace_queue_message(
-            msg.chat.id,
-            uid,
-            t["ai_queue_wait"].format(position=position),
-        )
-
-        while uid in users_ai_connecting and position > 1:
-            await asyncio.sleep(random.randint(5, 15))
-            if uid not in users_ai_connecting:
-                return
-
-            position = max(1, position - 1)
-            users_ai_queue_pos[uid] = position
-            queue_text = t["ai_queue_wait"].format(position=position)
-            await replace_queue_message(msg.chat.id, uid, queue_text)
+        await replace_queue_message(msg.chat.id, uid, t["ai_wait"])
+        await asyncio.sleep(7)
 
         if uid not in users_ai_connecting:
             return
 
         users_ai_connecting.discard(uid)
-        users_ai_queue_pos.pop(uid, None)
         users_ai_mode.add(uid)
         await safe_delete_message(msg.chat.id, users_ai_connect_wait_msg.pop(uid, None))
         await msg.answer(t["ai_prompt"], reply_markup=ReplyKeyboardRemove())
@@ -1376,13 +1428,13 @@ async def handle(msg: Message):
 
 
 # ================= ADMIN REPLY =================
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/reply"))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/reply(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def admin_reply(msg: Message):
-    if msg.chat.id != GROUP_ID:
+    if not await ensure_admin_group_command(msg):
         return
 
     try:
-        parts = msg.text.split(maxsplit=2)
+        parts = (msg.text or "").split(maxsplit=2)
         ticket_id = int(parts[1])
         answer = parts[2]
     except:
@@ -1392,17 +1444,18 @@ async def admin_reply(msg: Message):
     await send_admin_reply_to_user(msg, ticket_id, answer)
 
 
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.reply_to_message)
+@dp.message(
+    F.chat.type.in_({"group", "supergroup"}),
+    F.reply_to_message,
+    ~F.text.regexp(r"^/"),
+)
 async def admin_reply_by_reply(msg: Message):
-    if msg.chat.id != GROUP_ID:
+    if not await ensure_admin_group_command(msg, notify_denied=False):
         return
 
     if not msg.reply_to_message or not msg.reply_to_message.from_user:
         return
     if msg.reply_to_message.from_user.id != bot.id:
-        return
-
-    if msg.text and msg.text.startswith("/"):
         return
 
     answer = msg.text or msg.caption
@@ -1416,69 +1469,87 @@ async def admin_reply_by_reply(msg: Message):
         return
 
     await send_admin_reply_to_user(msg, ticket_id, answer)
+
+
 # ================= ADMIN COMMANDS (NEW) =================
+def _format_ticket_list(rows, title: str):
+    lines = [title, ""]
+    for row in rows:
+        lines.append(f"#{row['id']} | user: {row['user_id']} | thread: {row['thread_id']}")
+    return "\n".join(lines)
+
 
 # /stats
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("stats"))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/stats(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def stats_cmd(msg: Message):
+    if not await ensure_admin_group_command(msg):
+        return
 
     users = db.cur.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    total_tickets = db.cur.execute("SELECT COUNT(*) FROM tickets").fetchone()[0]
     open_tickets = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='open'").fetchone()[0]
     closed = db.cur.execute("SELECT COUNT(*) FROM tickets WHERE status='closed'").fetchone()[0]
+    total_messages = db.cur.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
 
     await msg.reply(
         f"📊 Statistika\n\n"
         f"👤 Users: {users}\n"
+        f"🎫 Jami ticket: {total_tickets}\n"
         f"🟢 Ochiq: {open_tickets}\n"
-        f"🔴 Yopilgan: {closed}"
+        f"🔴 Yopilgan: {closed}\n"
+        f"💬 Xabarlar: {total_messages}"
     )
 
 
 # /ochiq
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("ochiq"))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/ochiq(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def open_list(msg: Message):
+    if not await ensure_admin_group_command(msg):
+        return
 
     rows = db.cur.execute(
-        "SELECT id, user_id FROM tickets WHERE status='open' ORDER BY id DESC LIMIT 20"
+        "SELECT id, user_id, thread_id FROM tickets WHERE status='open' ORDER BY id DESC LIMIT 30"
     ).fetchall()
 
     if not rows:
-        return await msg.reply("Ochiq ticket yo‘q")
+        return await msg.reply("🟢 Ochiq ticket yo'q")
 
-    text = "🟢 Ochiq ticketlar:\n\n"
-
-    for t in rows:
-        text += f"#{t[0]} | {t[1]}\n"
-
+    text = _format_ticket_list(rows, f"🟢 Ochiq ticketlar ({len(rows)} ta):")
     await msg.reply(text)
 
 
 # /yopilgan
-@dp.message(F.chat.type.in_({"group", "supergroup"}), Command("yopilgan"))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/yopilgan(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def closed_list(msg: Message):
+    if not await ensure_admin_group_command(msg):
+        return
 
     rows = db.cur.execute(
-        "SELECT id, user_id FROM tickets WHERE status='closed' ORDER BY id DESC LIMIT 20"
+        "SELECT id, user_id, thread_id FROM tickets WHERE status='closed' ORDER BY id DESC LIMIT 30"
     ).fetchall()
 
     if not rows:
-        return await msg.reply("Yopilgan ticket yo‘q")
+        return await msg.reply("🔴 Yopilgan ticket yo'q")
 
-    text = "🔴 Yopilgan ticketlar:\n\n"
-
-    for t in rows:
-        text += f"#{t[0]} | {t[1]}\n"
-
+    text = _format_ticket_list(rows, f"🔴 Yopilgan ticketlar ({len(rows)} ta):")
     await msg.reply(text)
 
 
 # /open 5
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/open "))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/open(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def reopen_ticket(msg: Message):
-    try:
-        ticket_id = int(msg.text.split()[1])
-    except:
-        return await msg.reply("❌ Format: /open 5")
+    if not await ensure_admin_group_command(msg):
+        return
+
+    ticket_id = parse_ticket_id_from_command(msg.text or "") or extract_ticket_id_from_reply_chain(msg)
+    if not ticket_id:
+        return await msg.reply("❌ Format: /open 5 yoki ticket xabariga reply qiling")
+
+    row = db.cur.execute("SELECT status FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    if not row:
+        return await msg.reply(f"❌ Ticket #{ticket_id} topilmadi")
+    if row["status"] == "open":
+        return await msg.reply(f"ℹ️ Ticket #{ticket_id} allaqachon ochiq")
 
     db.cur.execute("UPDATE tickets SET status='open' WHERE id=?", (ticket_id,))
     db.conn.commit()
@@ -1487,12 +1558,20 @@ async def reopen_ticket(msg: Message):
 
 
 # /close 5
-@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.startswith("/close "))
+@dp.message(F.chat.type.in_({"group", "supergroup"}), F.text.regexp(r"(?i)^/close(?:@[A-Za-z0-9_]+)?(?:\s|$)"))
 async def close_ticket_cmd(msg: Message):
-    try:
-        ticket_id = int(msg.text.split()[1])
-    except:
-        return await msg.reply("❌ Format: /close 5")
+    if not await ensure_admin_group_command(msg):
+        return
+
+    ticket_id = parse_ticket_id_from_command(msg.text or "") or extract_ticket_id_from_reply_chain(msg)
+    if not ticket_id:
+        return await msg.reply("❌ Format: /close 5 yoki ticket xabariga reply qiling")
+
+    row = db.cur.execute("SELECT status FROM tickets WHERE id=?", (ticket_id,)).fetchone()
+    if not row:
+        return await msg.reply(f"❌ Ticket #{ticket_id} topilmadi")
+    if row["status"] == "closed":
+        return await msg.reply(f"ℹ️ Ticket #{ticket_id} allaqachon yopilgan")
 
     db.close_ticket(ticket_id)
 
@@ -1502,6 +1581,7 @@ async def close_ticket_cmd(msg: Message):
 # ================= RUN =================
 async def main():
     health_server = await start_health_server()
+    await setup_group_commands()
     await setup_mini_app_button()
     reminder_task = asyncio.create_task(reminder_loop())
 
